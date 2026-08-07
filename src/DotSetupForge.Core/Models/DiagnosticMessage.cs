@@ -9,16 +9,16 @@ public enum DiagnosticSeverity
 }
 
 /// <summary>统一诊断消息（带错误码，例如 DP1001）。</summary>
-public sealed class DiagnosticMessage
+public record DiagnosticMessage
 {
     /// <summary>错误码，例如 DP1001。</summary>
-    public string Code { get; set; } = string.Empty;
+    public string Code { get; init; } = string.Empty;
 
     /// <summary>严重级别。</summary>
-    public DiagnosticSeverity Severity { get; set; } = DiagnosticSeverity.Info;
+    public DiagnosticSeverity Severity { get; init; } = DiagnosticSeverity.Info;
 
     /// <summary>人类可读消息。</summary>
-    public string Message { get; set; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
 
     public static DiagnosticMessage Error(string code, string message) =>
         new() { Code = code, Severity = DiagnosticSeverity.Error, Message = message };

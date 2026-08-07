@@ -39,20 +39,20 @@ public enum RuntimeDeploymentMode
 }
 
 /// <summary>运行时要求。</summary>
-public sealed class RuntimeInfo
+public record RuntimeInfo
 {
     /// <summary>Runtime 家族。</summary>
-    public RuntimeFamily Family { get; set; } = RuntimeFamily.WindowsDesktop;
+    public RuntimeFamily Family { get; init; } = RuntimeFamily.WindowsDesktop;
 
     /// <summary>主版本号（如 10.0）。</summary>
-    public string Version { get; set; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
 
     /// <summary>目标架构。</summary>
-    public TargetArchitecture Architecture { get; set; } = TargetArchitecture.X64;
+    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X64;
 
     /// <summary>部署模式。</summary>
-    public RuntimeDeploymentMode Mode { get; set; } = RuntimeDeploymentMode.SmartOffline;
+    public RuntimeDeploymentMode Mode { get; init; } = RuntimeDeploymentMode.SmartOffline;
 
     /// <summary>是否自动检测（分析时自动填充）。</summary>
-    public bool AutoDetect { get; set; } = true;
+    public bool AutoDetect { get; init; } = true;
 }
