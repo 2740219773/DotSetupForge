@@ -1,9 +1,11 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using DotSetupForge.Application.Analysis;
+using DotSetupForge.Application.Build;
 using DotSetupForge.Application.Projects;
 using DotSetupForge.Application.Runtime;
 using DotSetupForge.Core.Analysis;
+using DotSetupForge.Core.Json;
 using DotSetupForge.Core.Models;
 using DotSetupForge.Core.Runtime;
 
@@ -26,10 +28,101 @@ internal static class Program
         {
             "test" => RunTest(),
             "analyze" => RunAnalyze(args[1..]),
+            "build" => RunBuild(args[1..]),
             "runtime" => RunRuntime(args[1..]),
             "-h" or "--help" or "" => PrintUsage(),
             _ => PrintUnknown(command),
         };
+    }
+
+    private static int RunBuild(string[] args)
+    {
+        var input = string.Empty;
+        string? outputDir = null;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--output-dir" when i + 1 < args.Length:
+                    outputDir = args[++i];
+                    break;
+                default:
+                    if (string.IsNullOrEmpty(input))
+                    {
+                        input = args[i];
+                    }
+                    break;
+            }
+        }
+
+        if (string.IsNullOrEmpty(input))
+        {
+            Console.WriteLine("用法: dotpack build <目录|RHCVP.pack.json> [--output-dir <dir>]");
+            return 1;
+        }
+
+        // 支持 .pack.json 或目录两种输入
+        PackageProject? project = null;
+        var sourceDirectory = input;
+
+        if (input.EndsWith(".pack.json", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(input))
+            {
+                Console.WriteLine($"错误 DP1004: 配置文件不存在 {input}");
+                return 1;
+            }
+
+            var load = ProjectSerializer.Deserialize(File.ReadAllText(input));
+            if (!load.Success || load.Project is null)
+            {
+                foreach (var error in load.Errors)
+                {
+                    Console.WriteLine($"错误 {error.Code}: {error.Message}");
+                }
+                return 1;
+            }
+
+            project = load.Project;
+            sourceDirectory = Path.IsPathRooted(project.Source.Path)
+                ? project.Source.Path
+                : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(input))!, project.Source.Path));
+        }
+
+        Console.WriteLine($"DotSetupForge");
+        Console.WriteLine($"Building {sourceDirectory}...");
+        Console.WriteLine();
+
+        var service = new BuildService();
+        var result = service.BuildAsync(
+            new BuildRequest(sourceDirectory, project, outputDir),
+            new Progress<string>(Console.WriteLine)).GetAwaiter().GetResult();
+
+        foreach (var warning in result.Warnings)
+        {
+            Console.WriteLine($"警告 {warning.Code}: {warning.Message}");
+        }
+
+        if (!result.Success)
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"错误 {error.Code}: {error.Message}");
+            }
+            Console.WriteLine();
+            Console.WriteLine($"构建失败（{result.Duration.TotalSeconds:F1} 秒）");
+            return 1;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("构建成功");
+        foreach (var artifact in result.Artifacts)
+        {
+            Console.WriteLine($"  {artifact}");
+        }
+        Console.WriteLine($"耗时 {result.Duration.TotalSeconds:F1} 秒");
+        return 0;
     }
 
     private static int RunAnalyze(string[] args)
@@ -295,6 +388,8 @@ internal static class Program
               dotpack test               创建 PackageProject 并验证序列化往返
               dotpack analyze <目录>      分析应用并生成 analysis.json
                           [--main-exe <exe>]  指定主程序（多候选时必填）
+              dotpack build <目录|pack.json>  完整构建安装包（需安装 Inno Setup）
+                          [--output-dir <dir>]
               dotpack runtime list       列出运行时缓存
               dotpack runtime ensure <family> <版本> [--arch]  下载运行时到缓存
 

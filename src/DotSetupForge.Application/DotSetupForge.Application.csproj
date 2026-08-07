@@ -2,10 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DotSetupForge.Core\DotSetupForge.Core.csproj" />
+    <ProjectReference Include="..\DotSetupForge.Inno\DotSetupForge.Inno.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

@@ -88,5 +88,8 @@ public sealed record InstallerModel
 
     public UninstallModel Uninstall { get; init; } = new(false, false);
 
+    /// <summary>安装完成后自动运行主程序。</summary>
+    public bool LaunchAfterInstall { get; init; }
+
     public SigningOptions Signing { get; init; } = new();
 }

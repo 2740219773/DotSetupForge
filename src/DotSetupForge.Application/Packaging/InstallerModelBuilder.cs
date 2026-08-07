@@ -47,6 +47,7 @@ public sealed class InstallerModelBuilder
                 project?.Installer.AllowUpgrade ?? true,
                 string.IsNullOrEmpty(mainExeName) ? null : Path.GetFileNameWithoutExtension(mainExeName)),
             Uninstall = new UninstallModel(KeepUserData: true, KeepLogs: false),
+            LaunchAfterInstall = project?.Installer.LaunchAfterInstall ?? false,
             Signing = project?.Signing ?? new SigningOptions(),
         };
     }

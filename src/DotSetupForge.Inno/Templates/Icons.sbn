@@ -1,0 +1,4 @@
+[Icons]
+{{ for s in shortcuts }}
+Name: "{{ s.fullName }}"; Filename: "{app}\{{ s.target }}"; WorkingDir: "{app}"
+{{ end }}

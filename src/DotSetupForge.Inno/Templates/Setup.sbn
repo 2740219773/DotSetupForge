@@ -1,0 +1,15 @@
+; 由 DotSetupForge 自动生成，请勿手动修改
+[Setup]
+AppId={{ appId }}
+AppName={{ appName }}
+AppVersion={{ appVersion }}
+AppPublisher={{ appPublisher }}
+DefaultDirName={{ installDirectory }}
+DefaultGroupName={{ appName }}
+PrivilegesRequired={{ privilegesRequired }}
+OutputDir={{ outputDirectory }}
+OutputBaseFilename={{ outputBaseFilename }}
+UninstallDisplayName={{ appName }}
+Compression=lzma2
+SolidCompression=yes
+WizardStyle=modern

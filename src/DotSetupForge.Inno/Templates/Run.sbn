@@ -1,0 +1,4 @@
+{{ if launchAfterInstall }}
+[Run]
+Filename: "{app}\{{ mainExecutable }}"; Description: "运行 {{ productName }}"; Flags: nowait postinstall skipifsilent
+{{ end }}

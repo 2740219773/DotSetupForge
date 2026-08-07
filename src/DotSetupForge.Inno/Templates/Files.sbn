@@ -1,0 +1,4 @@
+[Files]
+{{ for f in files }}
+Source: "{{ f.sourcePath }}"; DestDir: "{{ f.destDir }}"; Flags: {{ f.flags }}
+{{ end }}

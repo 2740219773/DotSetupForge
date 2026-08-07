@@ -1,0 +1,97 @@
+using DotSetupForge.Application.Analysis;
+using DotSetupForge.Application.Packaging;
+using DotSetupForge.Core.Models;
+using DotSetupForge.Core.Packaging;
+using DotSetupForge.Inno;
+
+namespace DotSetupForge.Application.Build;
+
+/// <summary>构建请求。</summary>
+public sealed record BuildRequest(
+    string SourceDirectory,
+    PackageProject? Project = null,
+    string? OutputDirectory = null);
+
+/// <summary>构建工作流：分析 → InstallerModel → installer.iss → ISCC 编译。</summary>
+public sealed class BuildService
+{
+    private readonly ApplicationAnalysisService _analysis = new();
+    private readonly InstallerModelBuilder _modelBuilder = new();
+    private readonly InnoScriptGenerator _scriptGenerator = new();
+    private readonly InnoSetupLocator _locator = new();
+    private readonly InnoCompiler _compiler = new();
+
+    public async Task<BuildResult> BuildAsync(
+        BuildRequest request,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        var started = DateTime.UtcNow;
+        var diagnostics = new List<DiagnosticMessage>();
+
+        // 1. 分析
+        progress?.Report("分析应用...");
+        var analysis = _analysis.Analyze(request.SourceDirectory);
+        if (!analysis.Success)
+        {
+            return BuildResult.Fail(analysis.Diagnostics, DateTime.UtcNow - started);
+        }
+
+        // 2. 构建安装模型
+        progress?.Report("构建安装模型...");
+        var model = _modelBuilder.Build(analysis, request.Project);
+
+        // 3. 生成 Inno 脚本
+        var outputDirectory = request.OutputDirectory
+            ?? (request.Project is null
+                ? Path.Combine(Directory.GetCurrentDirectory(), "dist")
+                : Path.GetFullPath(request.Project.Output.Directory));
+
+        var baseFilename = $"{model.Product.Name}_Setup_{model.Product.Version}";
+        progress?.Report("生成 installer.iss...");
+        var scriptResult = _scriptGenerator.GenerateToFile(
+            model,
+            new InnoScriptOptions(baseFilename, outputDirectory),
+            Path.Combine(Path.GetTempPath(), "DotSetupForge", "build", $"iss-{Guid.NewGuid():N}"));
+
+        // 4. 定位 ISCC
+        var location = _locator.Locate();
+        if (!location.Found)
+        {
+            diagnostics.Add(DiagnosticMessage.Error("DP3002", location.Error ?? "未找到 ISCC.exe"));
+            return BuildResult.Fail(diagnostics, DateTime.UtcNow - started);
+        }
+
+        // 5. 编译
+        progress?.Report("编译安装包...");
+        var compile = await _compiler.CompileAsync(
+            location.IsccPath!, scriptResult.IssPath, baseFilename, ct).ConfigureAwait(false);
+
+        foreach (var entry in compile.Log.Where(e => e.Level == InnoLogLevel.Warning))
+        {
+            diagnostics.Add(DiagnosticMessage.Warning("DP3003", entry.Message));
+        }
+
+        if (!compile.Success)
+        {
+            foreach (var entry in compile.Log.Where(e => e.Level == InnoLogLevel.Error))
+            {
+                diagnostics.Add(DiagnosticMessage.Error("DP3001", entry.Message));
+            }
+
+            if (diagnostics.Count == 0)
+            {
+                diagnostics.Add(DiagnosticMessage.Error("DP3001", $"ISCC 退出码 {compile.ExitCode}"));
+            }
+
+            return BuildResult.Fail(diagnostics, DateTime.UtcNow - started);
+        }
+
+        // 6. 产物路径：{OutputDir}\{BaseFilename}.exe
+        var artifact = compile.OutputFile
+            ?? Path.Combine(outputDirectory, $"{baseFilename}.exe");
+
+        progress?.Report($"完成：{artifact}");
+        return BuildResult.Ok(DateTime.UtcNow - started, artifact);
+    }
+}
