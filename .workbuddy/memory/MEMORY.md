@@ -7,8 +7,8 @@
 - 分层：UI → Application → Core + Inno；CLI 与 GUI 复用同一 Application 层
 
 ## 当前进度（2026-08-07）
-- M0 ✅ M1 ✅ M2-a ✅（Runtime 引擎） | M3 GUI 框架+全部页面 ✅（待交互验证） | M2-b / M4 / M5 待做
-- 测试基线：72 个通过（改动后需跑 `dotnet test DotSetupForge.sln`）
+- M0 ✅ M1 ✅ M2-a ✅ | M3 GUI 框架+全部页面 ✅（待交互验证） | M4-a ✅（CLI init/restore/clean + SigningService + 签名接入构建） | M2-b / M4-b（升级卸载/自定义 prerequisite）/ M5 待做
+- 测试基线：79 个通过（改动后需跑 `dotnet test DotSetupForge.sln`）
 
 ## 关键设计决策
 - Core 模型全部是 init 不可变 record → GUI 用 EditableProject（可写模型）承载编辑，保存时 ToProject() 还原
@@ -22,6 +22,8 @@
 3. RelayCommand<T> 的 CommandParameter 需 `{x:Static}` 传枚举，字符串不自动转换
 4. 本机未装 Inno Setup 6，真实 build 需用户安装（InnoSetupLocator 支持 INNO_SETUP_HOME 环境变量）
 5. RHCVP 真实测试目录：`D:\WorkProjects\2026\QXS26019 抗辐照芯片功能应用\RHCVP\...\bin\Release\net10.0-windows`
+6. 验证 GUI 后必须 taskkill /F /IM DotSetupForge.UI.exe，否则 DLL 被锁导致 MSB3027（Git Bash 用双斜杠 //F）
+7. 签名密码环境变量 `DOTSETFORGE_SIGN_PASSWORD`；signtool 定位 `SIGTOOL_PATH` → Windows Kits → PATH
 
 ## 约定
 - 提交信息风格：`feat: M{n}-{字母} 描述（第X阶段）` / `docs:` / `refactor:`
