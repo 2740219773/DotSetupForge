@@ -487,3 +487,4 @@ dist/
 *.user
 .vs/
 .reasonix/
+analysis.json
