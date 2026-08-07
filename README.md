@@ -33,11 +33,12 @@ tests/
 ## 开发状态
 
 - [x] M0: 项目骨架初始化（解决方案、项目结构、核心数据模型、`dotpack test` 序列化验收）
-- [ ] M1: 基础安装包（ApplicationAnalyzer → InstallerModel → Setup.exe）
-- [ ] M2: 智能 Runtime（检测、离线部署、自动跳过）
-- [ ] M3: GUI
-- [ ] M4: 工程化（.pack.json、CLI、升级、自定义 prerequisite）
-- [ ] M5: V1.0（签名、测试、文档、自身打包）
+- [x] M1: 基础安装包（ApplicationAnalyzer → InstallerModel → Setup.exe）
+- [x] M2-a: 智能 Runtime 引擎（检测、下载、SHA256 校验、缓存、前置依赖生成）
+- [ ] M2-b: 智能 Runtime 真实安装验证（虚拟机 A/B/C/D 验收）
+- [ ] M3: WPF GUI（应用 / 文件 / 运行环境 / 安装设置 / 版本 / 签名 / 构建）
+- [ ] M4: 工程化（CLI 完整子命令、升级卸载、自定义 prerequisite、签名）
+- [ ] M5: V1.0（完整测试、正式文档、自身打包、真实项目验证）
 
 ## 快速开始
 

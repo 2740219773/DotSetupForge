@@ -1,0 +1,111 @@
+<UserControl x:Class="DotSetupForge.UI.Views.VersionSigningPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="860" Margin="28,20,28,36">
+
+            <!-- 版本信息 -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="版本信息" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="产品名称、版本、发布者可在「应用」页修改，此处仅展示。"
+                               FontSize="11.5" Foreground="{StaticResource TextDisabledBrush}"
+                               Margin="0,0,0,10" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="产品名称" Style="{StaticResource FormLabelStyle}" />
+                            <TextBlock Text="{Binding Project.ProductName}" Style="{StaticResource ValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="版本" Style="{StaticResource FormLabelStyle}" />
+                            <TextBlock Text="{Binding Project.Version}" Style="{StaticResource ValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="AppId" Style="{StaticResource FormLabelStyle}" />
+                            <TextBlock Text="{Binding Project.AppId}" Style="{StaticResource ValueTextStyle}"
+                                       FontSize="11" ToolTip="升级时保持不变，禁止修改" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 输出设置 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="输出设置" Style="{StaticResource SectionTitleStyle}" />
+
+                    <TextBlock Text="输出目录" Style="{StaticResource FormLabelStyle}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding Project.OutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1" Content="浏览" Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0" Command="{Binding PickOutputDirectoryCommand}" />
+                    </Grid>
+
+                    <TextBlock Text="输出文件名模板" Style="{StaticResource FormLabelStyle}" Margin="0,14,0,0" />
+                    <TextBox Text="{Binding Project.OutputFileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="支持 {ProductName} 与 {Version} 变量" />
+
+                    <Border Background="{StaticResource InputBackgroundBrush}" CornerRadius="6"
+                            Padding="10,8" Margin="0,12,0,0"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="输出预览" FontSize="10.5"
+                                       Foreground="{StaticResource TextDisabledBrush}" />
+                            <TextBlock Text="{Binding OutputFileNamePreview}" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBrush}" Margin="0,3,0,0" />
+                            <TextBlock Text="{Binding OutputPathPreview}" FontSize="11.5"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 数字签名 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="数字签名" Style="{StaticResource SectionTitleStyle}" />
+
+                    <CheckBox IsChecked="{Binding Project.SigningEnabled, Mode=TwoWay}"
+                              Content="启用代码签名（签名 Setup.exe）" Margin="0,0,0,12" />
+
+                    <StackPanel IsEnabled="{Binding Project.SigningEnabled, Mode=OneWay}"
+                                Opacity="{Binding Project.SigningEnabled, Mode=OneWay, Converter={StaticResource BoolOpacity}}">
+                        <TextBlock Text="证书文件（PFX / P12）" Style="{StaticResource FormLabelStyle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding Project.CertificatePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Grid.Column="1" Content="浏览" Style="{StaticResource SecondaryButtonStyle}"
+                                    Margin="8,0,0,0" Command="{Binding BrowseCertificateCommand}" />
+                        </Grid>
+
+                        <TextBlock Text="时间戳服务器" Style="{StaticResource FormLabelStyle}" Margin="0,14,0,0" />
+                        <TextBox Text="{Binding Project.TimestampServer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Margin="0,12,0,0" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   Text="安全提示：证书密码不会写入 .pack.json。构建时通过环境变量、Windows 凭据管理器或构建时输入提供。" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

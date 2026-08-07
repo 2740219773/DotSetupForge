@@ -1,0 +1,156 @@
+<UserControl x:Class="DotSetupForge.UI.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:DotSetupForge.UI.Converters"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900">
+    <UserControl.Resources>
+        <conv:EmptyCollectionToVisibilityConverter x:Key="EmptyToVisibility" />
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="860" Margin="36,30,36,40">
+
+            <!-- 欢迎区 -->
+            <StackPanel Margin="0,10,0,30">
+                <TextBlock Text="DotSetupForge" FontSize="30" FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock Text="面向 .NET Windows 桌面程序的智能发布、依赖分析、环境部署与安装包生成工具"
+                           FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}"
+                           Margin="0,6,0,0" />
+            </StackPanel>
+
+            <!-- 新建项目 -->
+            <TextBlock Text="新建打包项目" Style="{StaticResource SectionTitleStyle}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 从程序目录创建 -->
+                <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,8,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NewProjectFromDirectoryCommand}" />
+                    </Border.InputBindings>
+                    <StackPanel>
+                        <TextBlock Text="从程序目录创建" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="选择已发布的应用目录（推荐 publish 目录），自动分析主程序、.NET 版本、架构与文件。" 
+                                   FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <TextBlock Text="推荐" Foreground="{StaticResource SuccessBrush}" FontSize="11"
+                                   Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 从 C# 项目创建 -->
+                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}" Margin="8,0,8,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding NewProjectFromCsprojCommand}" />
+                    </Border.InputBindings>
+                    <StackPanel>
+                        <TextBlock Text="从 C# 项目创建" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="选择 .csproj / .sln，自动执行 dotnet publish 后再打包。"
+                                   FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <TextBlock Text="即将支持" Foreground="{StaticResource WarningBrush}" FontSize="11"
+                                   Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 打开项目 -->
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Margin="8,0,0,0" Cursor="Hand">
+                    <Border.InputBindings>
+                        <MouseBinding MouseAction="LeftClick"
+                                      Command="{Binding OpenProjectFileCommand}" />
+                    </Border.InputBindings>
+                    <StackPanel>
+                        <TextBlock Text="打开项目文件" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="打开已有的 *.pack.json 配置文件，继续编辑或重新构建。"
+                                   FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <TextBlock Text=".pack.json" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                   Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 最近项目 -->
+            <TextBlock Text="最近项目" Style="{StaticResource SectionTitleStyle}" Margin="0,28,0,8" />
+            <Border Style="{StaticResource CardBorderStyle}" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ListBox Grid.Row="0" ItemsSource="{Binding RecentProjects}"
+                             BorderThickness="0" Background="Transparent"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                             MaxHeight="280">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource HoverBackgroundBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button Grid.Column="0" Style="{StaticResource LinkButtonStyle}"
+                                            HorizontalContentAlignment="Left" Padding="4,6"
+                                            Command="{Binding DataContext.OpenRecentProjectCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Path}" FontSize="11.5"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Grid.Column="1" Style="{StaticResource LinkButtonStyle}"
+                                            Content="移除" VerticalAlignment="Center"
+                                            Foreground="{StaticResource TextDisabledBrush}"
+                                            Command="{Binding DataContext.RemoveRecentProjectCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <TextBlock Grid.Row="1" Text="暂无最近项目，点击上方卡片开始。" FontSize="12"
+                               Foreground="{StaticResource TextDisabledBrush}" Margin="12,10"
+                               Visibility="{Binding RecentProjects, Converter={StaticResource EmptyToVisibility}}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

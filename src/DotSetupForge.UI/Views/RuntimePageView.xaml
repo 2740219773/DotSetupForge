@@ -1,0 +1,131 @@
+<UserControl x:Class="DotSetupForge.UI.Views.RuntimePageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:conv="clr-namespace:DotSetupForge.UI.Converters"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900">
+    <UserControl.Resources>
+        <conv:StringEqualsConverter x:Key="StringEquals" />
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="860" Margin="28,20,28,36">
+
+            <!-- 检测到的 Runtime -->
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text=".NET 运行环境" Style="{StaticResource SectionTitleStyle}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Runtime 家族" Style="{StaticResource FormLabelStyle}" />
+                            <TextBlock Text="{Binding Project.RuntimeFamily}" Style="{StaticResource ValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="版本" Style="{StaticResource FormLabelStyle}" />
+                            <TextBlock Text="{Binding Project.RuntimeVersion}" Style="{StaticResource ValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="架构" Style="{StaticResource FormLabelStyle}" />
+                            <TextBlock Text="{Binding Project.RuntimeArchitecture}" Style="{StaticResource ValueTextStyle}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Margin="0,12,0,0" FontSize="11.5"
+                               Foreground="{StaticResource TextDisabledBrush}"
+                               Text="版本与架构通常在「应用」页分析后自动填充；如需修改，请在项目配置中调整。" />
+                </StackPanel>
+            </Border>
+
+            <!-- 部署方式 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="部署方式" Style="{StaticResource SectionTitleStyle}" />
+
+                    <!-- 智能离线 -->
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=SmartOffline}">
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,10">
+                            <TextBlock Text="智能离线部署" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                            <Border Style="{StaticResource BadgeInfoStyle}" Margin="8,0,0,0">
+                                <TextBlock Text="推荐" Foreground="{StaticResource InfoBrush}" FontSize="10.5" />
+                            </Border>
+                        </StackPanel>
+                    </RadioButton>
+                    <TextBlock Text="Runtime 随安装包一起发布；目标机已有满足版本的 Runtime 时自动跳过安装。"
+                               FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="24,-6,0,14" />
+
+                    <!-- 在线 -->
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=Online}">
+                        <TextBlock Text="在线部署" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </RadioButton>
+                    <TextBlock Text="安装包不包含 Runtime，安装时从 Microsoft 下载（依赖网络，工业现场不建议默认）。"
+                               FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="24,-6,0,14" />
+
+                    <!-- Self-contained -->
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=SelfContained}">
+                        <TextBlock Text="Self-contained" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </RadioButton>
+                    <TextBlock Text="程序自包含运行时，不安装系统 Runtime（需在构建程序时启用自包含发布）。"
+                               FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="24,-6,0,14" />
+
+                    <!-- 不处理 -->
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=None}">
+                        <TextBlock Text="不处理 Runtime" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
+                    </RadioButton>
+                    <TextBlock Text="目标机已统一部署环境，安装包不包含任何 Runtime。"
+                               FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="24,-6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- Runtime 缓存 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="Runtime 缓存" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="{Binding CacheStatus}" FontSize="12.5"
+                               Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <ProgressBar Height="6" Value="{Binding DownloadProgress}"
+                                         Maximum="1" Margin="0,0,12,0"
+                                         Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}">
+                                <ProgressBar.Style>
+                                    <Style TargetType="ProgressBar">
+                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                        <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                    </Style>
+                                </ProgressBar.Style>
+                            </ProgressBar>
+                            <TextBlock Text="{Binding CachedFileName}" FontSize="11"
+                                       Foreground="{StaticResource TextDisabledBrush}"
+                                       Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="检查缓存" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding CheckCacheCommand}" Margin="0,0,8,0"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
+                            <Button Content="下载 Runtime" Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{Binding DownloadCommand}"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,152 @@
+<UserControl x:Class="DotSetupForge.UI.Views.BuildPageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="900">
+    <Grid Margin="20,16,20,20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="330" />
+            <ColumnDefinition Width="8" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左：Pipeline 步骤 -->
+        <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="14">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="构建流程" Style="{StaticResource SectionTitleStyle}" />
+                <ItemsControl ItemsSource="{Binding Steps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 状态图标 -->
+                                <Border x:Name="IconBadge" Width="24" Height="24" CornerRadius="12"
+                                        Background="#2E323B" BorderBrush="{StaticResource BorderStrongBrush}"
+                                        BorderThickness="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="IconText" Text="{Binding StatusIcon}" FontSize="11"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                               Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding Detail}" FontSize="10.5"
+                                               Foreground="{StaticResource TextDisabledBrush}"
+                                               TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
+                                               Visibility="{Binding Detail, Converter={StaticResource EmptyTextToVisibility}}" />
+                                </StackPanel>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Status}" Value="Running">
+                                    <Setter TargetName="IconBadge" Property="Background" Value="{StaticResource AccentBrush}" />
+                                    <Setter TargetName="IconBadge" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                    <Setter TargetName="IconText" Property="Foreground" Value="White" />
+                                    <Setter Property="TextBlock.Foreground" TargetName="IconText" Value="White" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                    <Setter TargetName="IconBadge" Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+                                    <Setter TargetName="IconBadge" Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
+                                    <Setter TargetName="IconText" Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                    <Setter TargetName="IconBadge" Property="Background" Value="{StaticResource ErrorSoftBrush}" />
+                                    <Setter TargetName="IconBadge" Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+                                    <Setter TargetName="IconText" Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="Skipped">
+                                    <Setter TargetName="IconText" Property="Foreground" Value="{StaticResource TextDisabledBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+        </Border>
+
+        <!-- 右：日志与操作 -->
+        <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="14">
+            <DockPanel>
+                <!-- 操作按钮 -->
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding StatusText}" FontSize="13" FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="取消" Style="{StaticResource DangerButtonStyle}"
+                                Command="{Binding CancelBuildCommand}" Margin="0,0,8,0"
+                                Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Content="开始构建" Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding BuildCommand}"
+                                IsEnabled="{Binding IsBuilding, Converter={StaticResource InvertBool}}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- 日志 -->
+                <ListBox x:Name="LogList" DockPanel.Dock="Top" Height="360"
+                         ItemsSource="{Binding LogLines}"
+                         FontFamily="Cascadia Mono, Consolas" FontSize="11.5"
+                         Background="{StaticResource InputBackgroundBrush}"
+                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         Margin="0,0,0,12">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="6,2" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter />
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="NoWrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- 构建结果 -->
+                <Border Background="{StaticResource SuccessSoftBrush}" CornerRadius="6"
+                        BorderBrush="{StaticResource SuccessBrush}" BorderThickness="1"
+                        Padding="12,10"
+                        Visibility="{Binding BuildSucceeded, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding BuildSummary}" FontSize="12.5" FontWeight="SemiBold"
+                                       Foreground="{StaticResource SuccessBrush}" />
+                            <TextBlock Text="{Binding ArtifactPath}" FontSize="12"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4,0,0"
+                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding ArtifactPath}" />
+                            <TextBlock Text="{Binding ArtifactSize}" FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="打开目录" Style="{StaticResource SecondaryButtonStyle}"
+                                VerticalAlignment="Center" Command="{Binding OpenArtifactFolderCommand}" />
+                    </Grid>
+                </Border>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

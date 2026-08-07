@@ -3,10 +3,166 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:DotSetupForge.UI"
+        xmlns:vm="clr-namespace:DotSetupForge.UI.ViewModels"
+        xmlns:views="clr-namespace:DotSetupForge.UI.Views"
+        xmlns:conv="clr-namespace:DotSetupForge.UI.Converters"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="DotSetupForge — .NET Windows 应用打包工具"
+        Width="1180" Height="760"
+        MinWidth="960" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource WindowBackgroundBrush}"
+        FontFamily="Segoe UI">
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:MainViewModel}">
+            <views:HomeView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ApplicationPageViewModel}">
+            <views:ApplicationPageView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FilesPageViewModel}">
+            <views:FilesPageView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:RuntimePageViewModel}">
+            <views:RuntimePageView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:InstallerPageViewModel}">
+            <views:InstallerPageView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:VersionSigningPageViewModel}">
+            <views:VersionSigningPageView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:BuildPageViewModel}">
+            <views:BuildPageView />
+        </DataTemplate>
+    </Window.Resources>
 
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="216" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ================= 左侧导航 ================= -->
+        <Border Grid.Column="0" Background="{StaticResource PanelBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Logo 区 -->
+                <StackPanel DockPanel.Dock="Top" Margin="18,20,18,14">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="30" Height="30" CornerRadius="8"
+                                Background="{StaticResource AccentBrush}" VerticalAlignment="Center">
+                            <TextBlock Text="DSF" Foreground="White" FontWeight="Bold" FontSize="11"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="DotSetupForge" Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold" FontSize="14" />
+                            <TextBlock Text="打包工具" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- 当前项目 -->
+                    <Border Margin="0,14,0,0" Padding="10,8" CornerRadius="6"
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Visibility="{Binding IsProjectOpen, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="当前项目" FontSize="10"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding ProjectDisplayName}" FontSize="12.5"
+                                       FontWeight="SemiBold" Margin="0,2,0,0"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <Border DockPanel.Dock="Bottom" Padding="18,12">
+                    <TextBlock Text="v0.4.0 · M3 GUI" FontSize="11"
+                               Foreground="{StaticResource TextDisabledBrush}" />
+                </Border>
+
+                <!-- 导航项 -->
+                <StackPanel Margin="8,0,8,0">
+                    <RadioButton Style="{StaticResource NavItemStyle}" Content="首页"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=Home}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Home}" />
+
+                    <Rectangle Height="1" Fill="{StaticResource BorderBrush}" Margin="14,6" />
+
+                    <RadioButton Style="{StaticResource NavItemStyle}" Tag="1" Content="应用"
+                                 IsEnabled="{Binding IsProjectOpen}"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=Application}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Application}" />
+                    <RadioButton Style="{StaticResource NavItemStyle}" Tag="2" Content="文件"
+                                 IsEnabled="{Binding IsProjectOpen}"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=Files}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Files}" />
+                    <RadioButton Style="{StaticResource NavItemStyle}" Tag="3" Content="运行环境"
+                                 IsEnabled="{Binding IsProjectOpen}"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=Runtime}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Runtime}" />
+                    <RadioButton Style="{StaticResource NavItemStyle}" Tag="4" Content="安装设置"
+                                 IsEnabled="{Binding IsProjectOpen}"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=Installer}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Installer}" />
+                    <RadioButton Style="{StaticResource NavItemStyle}" Tag="5" Content="版本与签名"
+                                 IsEnabled="{Binding IsProjectOpen}"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=VersionSigning}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.VersionSigning}" />
+                    <RadioButton Style="{StaticResource NavItemStyle}" Tag="6" Content="构建"
+                                 IsEnabled="{Binding IsProjectOpen}"
+                                 IsChecked="{Binding CurrentPageKind, Converter={StaticResource EnumEquals}, ConverterParameter=Build}"
+                                 Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Build}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ================= 右侧主区 ================= -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="52" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- 顶部标题栏 -->
+            <Border Grid.Row="0" Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitleStyle}" />
+                        <TextBlock Text="{Binding ProjectPath, StringFormat='  ·  {0}'}"
+                                   Foreground="{StaticResource TextDisabledBrush}" FontSize="11.5"
+                                   VerticalAlignment="Bottom" Margin="10,0,0,2"
+                                   MaxWidth="360" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsProjectOpen, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="保存" Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="0,0,8,0"
+                                Command="{Binding SaveProjectCommand}"
+                                Visibility="{Binding IsProjectOpen, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Content="保存为" Style="{StaticResource LinkButtonStyle}"
+                                Margin="0,0,16,0"
+                                Command="{Binding SaveProjectAsCommand}"
+                                Visibility="{Binding IsProjectOpen, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Content="生成安装包" Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding NavigateToCommand}" CommandParameter="{x:Static vm:PageKind.Build}"
+                                Visibility="{Binding IsProjectOpen, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 内容区 -->
+            <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
+        </Grid>
     </Grid>
 </Window>
