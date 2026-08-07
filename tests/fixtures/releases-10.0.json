@@ -1,0 +1,44 @@
+{
+  "releases": [
+    {
+      "version": "10.0.0",
+      "runtime": {
+        "version": "10.0.0",
+        "files": [
+          { "name": "dotnet-runtime-10.0.0-win-x64.exe", "rid": "win-x64", "url": "https://example/dotnet-runtime-10.0.0-win-x64.exe", "hash": "AAA" }
+        ]
+      },
+      "windowsdesktop": [
+        {
+          "version": "10.0.0",
+          "files": [
+            { "name": "windowsdesktop-runtime-10.0.0-win-x86.exe", "rid": "win-x86", "url": "https://example/wd-10.0.0-x86.exe", "hash": "BBB" },
+            { "name": "windowsdesktop-runtime-10.0.0-win-x64.exe", "rid": "win-x64", "url": "https://example/wd-10.0.0-x64.exe", "hash": "CCC" }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "10.0.1",
+      "runtime": {
+        "version": "10.0.1",
+        "files": []
+      },
+      "windowsdesktop": [
+        {
+          "version": "10.0.1",
+          "files": [
+            { "name": "windowsdesktop-runtime-10.0.1-win-x64.exe", "rid": "win-x64", "url": "https://example/wd-10.0.1-x64.exe", "hash": "DDD" }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "9.0.0",
+      "runtime": {
+        "version": "9.0.0",
+        "files": []
+      }
+    }
+  ]
+}

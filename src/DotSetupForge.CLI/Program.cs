@@ -2,7 +2,10 @@
 using System.Text.Json.Serialization;
 using DotSetupForge.Application.Analysis;
 using DotSetupForge.Application.Projects;
+using DotSetupForge.Application.Runtime;
 using DotSetupForge.Core.Analysis;
+using DotSetupForge.Core.Models;
+using DotSetupForge.Core.Runtime;
 
 namespace DotSetupForge.CLI;
 
@@ -23,6 +26,7 @@ internal static class Program
         {
             "test" => RunTest(),
             "analyze" => RunAnalyze(args[1..]),
+            "runtime" => RunRuntime(args[1..]),
             "-h" or "--help" or "" => PrintUsage(),
             _ => PrintUnknown(command),
         };
@@ -117,6 +121,122 @@ internal static class Program
         }
     }
 
+    private static int RunRuntime(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("用法: dotpack runtime <list|ensure>");
+            return 1;
+        }
+
+        return args[0] switch
+        {
+            "list" => RunRuntimeList(),
+            "ensure" => RunRuntimeEnsure(args[1..]),
+            _ => PrintRuntimeUsage(),
+        };
+    }
+
+    private static int RunRuntimeList()
+    {
+        var service = new RuntimeService();
+        var cached = service.ListCached();
+
+        if (cached.Count == 0)
+        {
+            Console.WriteLine("缓存为空。");
+            return 0;
+        }
+
+        foreach (var c in cached.OrderBy(c => c.Family).ThenBy(c => c.Version))
+        {
+            Console.WriteLine($"{c.Family} {c.Version} {c.Architecture}  ({c.FileName})");
+        }
+
+        return 0;
+    }
+
+    private static int RunRuntimeEnsure(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            Console.WriteLine("用法: dotpack runtime ensure <desktop|dotnet|aspnetcore> <版本> [--arch x64|x86|arm64]");
+            return 1;
+        }
+
+        var familyText = args[0];
+        var version = args[1];
+        var arch = TargetArchitecture.X64;
+
+        for (var i = 2; i < args.Length; i++)
+        {
+            if (args[i] == "--arch" && i + 1 < args.Length)
+            {
+                arch = args[++i].ToLowerInvariant() switch
+                {
+                    "x86" => TargetArchitecture.X86,
+                    "arm64" => TargetArchitecture.Arm64,
+                    _ => TargetArchitecture.X64,
+                };
+            }
+        }
+
+        var family = familyText.ToLowerInvariant() switch
+        {
+            "dotnet" => RuntimeFamily.DotNet,
+            "aspnetcore" => RuntimeFamily.AspNetCore,
+            _ => RuntimeFamily.WindowsDesktop,
+        };
+
+        var requirement = new RuntimeRequirement(family, version, arch);
+        var service = CreateRuntimeService();
+
+        Console.WriteLine($"解析 {requirement.Family} {requirement.Version} {requirement.Architecture}...");
+
+        var result = service.EnsureAsync(requirement, new Progress<double>(p =>
+            Console.Write($"\r下载进度: {p:P0}   "))).GetAwaiter().GetResult();
+
+        Console.WriteLine();
+
+        if (!result.Success)
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"错误 {error.Code}: {error.Message}");
+            }
+            return 1;
+        }
+
+        Console.WriteLine(result.FromCache
+            ? $"命中缓存: {result.InstallerPath}"
+            : $"已下载并缓存: {result.InstallerPath}");
+        return 0;
+    }
+
+    private static RuntimeService CreateRuntimeService()
+    {
+        // 离线/内网镜像：目录下按 {major.minor}/releases.json 组织
+        var offlineDir = Environment.GetEnvironmentVariable("DOTSETFORGE_RELEASE_METADATA_DIR");
+        if (!string.IsNullOrEmpty(offlineDir))
+        {
+            return new RuntimeService(
+                new MicrosoftRuntimeCatalog(new FileReleaseMetadataProvider(offlineDir)));
+        }
+
+        return new RuntimeService();
+    }
+
+    private static int PrintRuntimeUsage()
+    {
+        Console.WriteLine("""
+            用法:
+              dotpack runtime list
+              dotpack runtime ensure <desktop|dotnet|aspnetcore> <版本> [--arch x64|x86|arm64]
+
+            """);
+        return 1;
+    }
+
     private static int RunTest()
     {
         Console.WriteLine("DotSetupForge");
@@ -175,6 +295,8 @@ internal static class Program
               dotpack test               创建 PackageProject 并验证序列化往返
               dotpack analyze <目录>      分析应用并生成 analysis.json
                           [--main-exe <exe>]  指定主程序（多候选时必填）
+              dotpack runtime list       列出运行时缓存
+              dotpack runtime ensure <family> <版本> [--arch]  下载运行时到缓存
 
             """);
         return 0;
