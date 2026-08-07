@@ -27,9 +27,12 @@ internal static class Program
         return command switch
         {
             "test" => RunTest(),
+            "init" => RunInit(args[1..]),
             "analyze" => RunAnalyze(args[1..]),
+            "restore" => RunRestore(args[1..]),
             "build" => RunBuild(args[1..]),
             "runtime" => RunRuntime(args[1..]),
+            "clean" => RunClean(args[1..]),
             "-h" or "--help" or "" => PrintUsage(),
             _ => PrintUnknown(command),
         };
@@ -122,6 +125,212 @@ internal static class Program
             Console.WriteLine($"  {artifact}");
         }
         Console.WriteLine($"耗时 {result.Duration.TotalSeconds:F1} 秒");
+        return 0;
+    }
+
+    private static int RunInit(string[] args)
+    {
+        var name = string.Empty;
+        var version = "1.0.0";
+        var publisher = string.Empty;
+        var directory = string.Empty;
+        var output = string.Empty;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--name" when i + 1 < args.Length: name = args[++i]; break;
+                case "--version" when i + 1 < args.Length: version = args[++i]; break;
+                case "--publisher" when i + 1 < args.Length: publisher = args[++i]; break;
+                case "--directory" when i + 1 < args.Length: directory = args[++i]; break;
+                case "--output" when i + 1 < args.Length: output = args[++i]; break;
+                case "--help" or "-h":
+                    Console.WriteLine("用法: dotpack init [--name <名称>] [--version <1.0.0>] [--publisher <发布者>] [--directory <发布目录>] [--output <xxx.pack.json>]");
+                    return 0;
+                default:
+                    break;
+            }
+        }
+
+        if (string.IsNullOrEmpty(name))
+        {
+            Console.WriteLine("错误 DP1005: 必须指定 --name（产品名称）");
+            return 1;
+        }
+
+        var project = new PackageProject
+        {
+            SchemaVersion = PackageProject.CurrentSchemaVersion,
+            Product = new ProductInfo
+            {
+                AppId = Guid.NewGuid(),
+                Name = name,
+                Version = version,
+                Publisher = publisher,
+            },
+            Source = new SourceInfo
+            {
+                Type = SourceType.Directory,
+                Path = string.IsNullOrEmpty(directory) ? "./publish" : directory,
+                Configuration = "Release",
+            },
+            Runtime = new RuntimeInfo
+            {
+                Family = RuntimeFamily.WindowsDesktop,
+                Version = string.Empty,
+                Architecture = TargetArchitecture.X64,
+                Mode = RuntimeDeploymentMode.SmartOffline,
+                AutoDetect = true,
+            },
+            Installer = new InstallerOptions
+            {
+                Scope = InstallScope.Machine,
+                CreateDesktopShortcut = true,
+                CreateStartMenuShortcut = true,
+                LaunchAfterInstall = false,
+                AllowUpgrade = true,
+            },
+            Output = new OutputOptions
+            {
+                Directory = "./dist",
+                FileName = "{ProductName}_Setup_{Version}.exe",
+            },
+        };
+
+        // 指定发布目录时自动分析填充
+        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+        {
+            Console.WriteLine($"分析 {directory} ...");
+            var analysis = new ApplicationAnalysisService().Analyze(directory);
+            if (analysis.Success)
+            {
+                project = project with
+                {
+                    Product = project.Product with
+                    {
+                        Name = name,
+                        MainExecutable = Path.GetFileName(analysis.MainExecutable ?? string.Empty),
+                        Version = string.IsNullOrEmpty(analysis.Version) ? version : analysis.Version,
+                    },
+                    Runtime = project.Runtime with
+                    {
+                        Family = analysis.FrameworkName switch
+                        {
+                            "Microsoft.WindowsDesktop.App" => RuntimeFamily.WindowsDesktop,
+                            "Microsoft.AspNetCore.App" => RuntimeFamily.AspNetCore,
+                            _ => RuntimeFamily.DotNet,
+                        },
+                        Version = MajorMinor(analysis.FrameworkVersion),
+                        Architecture = analysis.Architecture,
+                        AutoDetect = true,
+                    },
+                };
+                Console.WriteLine($"  主程序: {Path.GetFileName(analysis.MainExecutable)}");
+                Console.WriteLine($"  框架: {analysis.FrameworkName} {analysis.FrameworkVersion}");
+                Console.WriteLine($"  架构: {analysis.Architecture}");
+            }
+            else
+            {
+                Console.WriteLine("  警告: 目录分析失败，已生成基础配置（可在 GUI 中补充）");
+                foreach (var d in analysis.Diagnostics)
+                {
+                    Console.WriteLine($"    {d.Code} {d.Message}");
+                }
+            }
+        }
+
+        if (string.IsNullOrEmpty(output))
+        {
+            output = $"{name}.pack.json";
+        }
+
+        File.WriteAllText(output, new PackageProjectService().Serialize(project));
+        Console.WriteLine($"已创建项目配置: {output} (AppId: {project.Product.AppId})");
+        Console.WriteLine("下一步: dotpack analyze / dotpack restore / dotpack build");
+        return 0;
+    }
+
+    private static string MajorMinor(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return string.Empty;
+        }
+
+        var parts = version.Split('.');
+        return parts.Length >= 2 ? $"{parts[0]}.{parts[1]}" : version;
+    }
+
+    private static int RunRestore(string[] args)
+    {
+        if (args.Length < 1)
+        {
+            Console.WriteLine("用法: dotpack restore <xxx.pack.json>");
+            return 1;
+        }
+
+        var input = args[0];
+        if (!File.Exists(input))
+        {
+            Console.WriteLine($"错误 DP1004: 配置文件不存在 {input}");
+            return 1;
+        }
+
+        var load = ProjectSerializer.Deserialize(File.ReadAllText(input));
+        if (!load.Success || load.Project is null)
+        {
+            foreach (var error in load.Errors)
+            {
+                Console.WriteLine($"错误 {error.Code}: {error.Message}");
+            }
+            return 1;
+        }
+
+        var project = load.Project;
+        var mode = project.Runtime.Mode;
+        if (mode is not (RuntimeDeploymentMode.SmartOffline or RuntimeDeploymentMode.Online))
+        {
+            Console.WriteLine($"部署模式 {mode} 不需要 Runtime，无需 restore。");
+            return 0;
+        }
+
+        if (string.IsNullOrEmpty(project.Runtime.Version))
+        {
+            Console.WriteLine("错误 DP1006: 项目未指定 Runtime 版本（可先 dotpack analyze 或编辑 .pack.json）");
+            return 1;
+        }
+
+        var requirement = new RuntimeRequirement(
+            project.Runtime.Family, project.Runtime.Version, project.Runtime.Architecture);
+        Console.WriteLine($"解析 {requirement.Family} {requirement.Version} {requirement.Architecture} ...");
+
+        var service = CreateRuntimeService();
+        var result = service.EnsureAsync(requirement, new Progress<double>(p =>
+            Console.Write($"\r下载进度: {p:P0}   "))).GetAwaiter().GetResult();
+
+        Console.WriteLine();
+
+        if (!result.Success)
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"错误 {error.Code}: {error.Message}");
+            }
+            return 1;
+        }
+
+        Console.WriteLine(result.FromCache
+            ? $"命中缓存: {result.InstallerPath}"
+            : $"已下载并缓存: {result.InstallerPath}");
+        return 0;
+    }
+
+    private static int RunClean(string[] args)
+    {
+        var service = new RuntimeService();
+        service.Clean();
+        Console.WriteLine("Runtime 缓存已清理。");
         return 0;
     }
 
@@ -386,12 +595,17 @@ internal static class Program
 
             用法:
               dotpack test               创建 PackageProject 并验证序列化往返
+              dotpack init               创建 .pack.json 项目配置
+                          [--name <名称>] [--version <1.0.0>] [--publisher <发布者>]
+                          [--directory <发布目录>] [--output <xxx.pack.json>]
               dotpack analyze <目录>      分析应用并生成 analysis.json
                           [--main-exe <exe>]  指定主程序（多候选时必填）
+              dotpack restore <pack.json> 解析项目 Runtime 需求并确保缓存命中
               dotpack build <目录|pack.json>  完整构建安装包（需安装 Inno Setup）
                           [--output-dir <dir>]
               dotpack runtime list       列出运行时缓存
               dotpack runtime ensure <family> <版本> [--arch]  下载运行时到缓存
+              dotpack clean              清理运行时缓存
 
             """);
         return 0;

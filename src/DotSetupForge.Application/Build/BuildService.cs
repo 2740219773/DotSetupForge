@@ -126,8 +126,66 @@ public sealed class BuildService
         var artifact = compile.OutputFile
             ?? Path.Combine(outputDirectory, $"{baseFilename}.exe");
 
+        // 7. 签名（可选，默认只签 Setup.exe）
+        var signing = request.Project?.Signing;
+        if (signing is { Enabled: true })
+        {
+            progress?.Report("数字签名...");
+            var signed = await SignArtifactAsync(artifact, signing, ct).ConfigureAwait(false);
+            if (!signed.Success)
+            {
+                return BuildResult.Fail([signed.Error], DateTime.UtcNow - started);
+            }
+
+            progress?.Report($"签名完成：{artifact}");
+        }
+
         progress?.Report($"完成：{artifact}");
         return BuildResult.Ok(DateTime.UtcNow - started, artifact);
+    }
+
+    /// <summary>对产物执行 Authenticode 签名并验证。密码只从环境变量读取，绝不落盘。</summary>
+    private static async Task<(bool Success, DiagnosticMessage Error)> SignArtifactAsync(
+        string artifact,
+        Core.Models.SigningOptions signing,
+        CancellationToken ct)
+    {
+        var signer = new Core.Signing.SigningService();
+
+        var location = signer.Locate();
+        if (!location.Found || location.SigntoolPath is null)
+        {
+            return (false, DiagnosticMessage.Error("DP4001", location.Error ?? "未找到 signtool.exe"));
+        }
+
+        if (string.IsNullOrEmpty(signing.CertificatePath) || !File.Exists(signing.CertificatePath))
+        {
+            return (false, DiagnosticMessage.Error("DP4001", $"证书文件不存在：{signing.CertificatePath}"));
+        }
+
+        var password = Environment.GetEnvironmentVariable(
+            Core.Signing.SigningService.PasswordEnvironmentVariable) ?? string.Empty;
+        if (string.IsNullOrEmpty(password))
+        {
+            return (false, DiagnosticMessage.Error(
+                "DP4001",
+                $"未提供证书密码。请设置环境变量 {Core.Signing.SigningService.PasswordEnvironmentVariable}（密码不会写入 .pack.json）。"));
+        }
+
+        var signResult = await signer.SignAsync(
+            artifact, signing.CertificatePath, password, signing.TimestampServer, ct).ConfigureAwait(false);
+        if (!signResult.Success)
+        {
+            return (false, DiagnosticMessage.Error("DP4001", $"签名失败：{signResult.Error}"));
+        }
+
+        var verifyResult = await signer.VerifyAsync(artifact, ct).ConfigureAwait(false);
+        if (!verifyResult.Success)
+        {
+            return (false, DiagnosticMessage.Error("DP4001", $"签名验证失败：{verifyResult.Error}"));
+        }
+
+        return (true, DiagnosticMessage.Error("DP4001", string.Empty));
     }
 
     /// <summary>是否内嵌运行时：Framework-dependent 且部署模式为智能离线/在线。</summary>

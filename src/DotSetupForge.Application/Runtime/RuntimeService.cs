@@ -23,6 +23,12 @@ public sealed class RuntimeService
 
     public IReadOnlyList<CachedRuntime> ListCached() => _cache.List();
 
+    /// <summary>清空全部 Runtime 缓存。</summary>
+    public void Clean() => _cache.Clear();
+
+    /// <summary>删除单个缓存条目。</summary>
+    public void RemoveCached(CachedRuntime entry) => _cache.Remove(entry);
+
     public Task<RuntimeDownloadResult> EnsureAsync(
         RuntimeRequirement requirement,
         IProgress<double>? progress = null,

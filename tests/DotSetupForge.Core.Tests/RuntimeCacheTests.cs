@@ -109,4 +109,41 @@ public class RuntimeCacheTests : IDisposable
         Assert.True(File.Exists(Path.Combine(entryDir, "windowsdesktop-runtime-10.0.1-win-x64.exe")));
         Assert.False(File.Exists(installer)); // 源文件已移动
     }
+
+    [Fact]
+    public void Remove_Should_Delete_Single_Entry()
+    {
+        SaveSample("10.0.1", TargetArchitecture.X64);
+        SaveSample("10.0.1", TargetArchitecture.X86);
+
+        var x64 = _cache.Find(new RuntimeRequirement(
+            RuntimeFamily.WindowsDesktop, "10.0", TargetArchitecture.X64));
+        Assert.NotNull(x64);
+
+        _cache.Remove(x64!);
+
+        var remaining = _cache.List();
+        Assert.Single(remaining);
+        Assert.Equal(TargetArchitecture.X86, remaining[0].Architecture);
+    }
+
+    [Fact]
+    public void Clear_Should_Empty_Whole_Cache()
+    {
+        SaveSample("9.0.0", TargetArchitecture.X64);
+        SaveSample("10.0.1", TargetArchitecture.X64);
+
+        _cache.Clear();
+
+        Assert.Empty(_cache.List());
+        Assert.False(Directory.Exists(_tempRoot));
+    }
+
+    [Fact]
+    public void Clear_On_Empty_Cache_Should_Not_Throw()
+    {
+        // 目录不存在时不应抛异常
+        _cache.Clear();
+        Assert.Empty(_cache.List());
+    }
 }

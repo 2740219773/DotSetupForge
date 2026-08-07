@@ -46,8 +46,21 @@ tests/
 # 运行 GUI（需先安装 Inno Setup 6 才能完整构建安装包）
 dotnet run --project src/DotSetupForge.UI
 
-# 运行 CLI test 命令（创建/序列化/反序列化 PackageProject 验收）
-dotnet run --project src/DotSetupForge.CLI -- test
+# 创建项目配置并自动分析发布目录
+dotnet run --project src/DotSetupForge.CLI -- init --name MyApp --directory ./publish
+
+# 分析应用（生成 analysis.json）
+dotnet run --project src/DotSetupForge.CLI -- analyze ./publish
+
+# 解析项目 Runtime 需求并下载到本地缓存
+dotnet run --project src/DotSetupForge.CLI -- restore MyApp.pack.json
+
+# 完整构建安装包
+dotnet run --project src/DotSetupForge.CLI -- build MyApp.pack.json
+
+# 运行时缓存管理
+dotnet run --project src/DotSetupForge.CLI -- runtime list
+dotnet run --project src/DotSetupForge.CLI -- clean
 ```
 
 ## 文档

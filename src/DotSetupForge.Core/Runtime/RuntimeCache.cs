@@ -121,6 +121,26 @@ public sealed class RuntimeCache
         return cached;
     }
 
+    /// <summary>删除全部缓存条目（清空缓存目录）。</summary>
+    public void Clear()
+    {
+        if (!Directory.Exists(RootDirectory))
+        {
+            return;
+        }
+
+        Directory.Delete(RootDirectory, recursive: true);
+    }
+
+    /// <summary>删除指定缓存条目（按安装包完整路径）。</summary>
+    public void Remove(CachedRuntime entry)
+    {
+        if (Directory.Exists(entry.Directory))
+        {
+            Directory.Delete(entry.Directory, recursive: true);
+        }
+    }
+
     private static (int Major, int Minor) ParseMajorMinor(string version)
     {
         var v = Version.TryParse(version, out var parsed) ? parsed : new Version(0, 0);
