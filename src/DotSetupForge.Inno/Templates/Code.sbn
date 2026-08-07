@@ -1,1 +1,120 @@
-; Pascal 脚本（预留：Runtime 检测 / 进程检测）
+{{ if hasPrerequisites }}
+[Code]
+
+const
+  DotNetSuccessCode = {{ successCode }};
+  DotNetRebootCode = {{ rebootCode }};
+
+var
+  DotNetRebootRequired: Boolean;
+
+{--- 版本比较：解析 "major.minor[.patch]" ---}
+function ParseMajorMinor(S: String; var Major: Integer; var Minor: Integer): Boolean;
+var
+  DotPos: Integer;
+begin
+  DotPos := Pos('.', S);
+  if DotPos = 0 then
+  begin
+    Result := False;
+    exit;
+  end;
+  Major := StrToIntDef(Copy(S, 1, DotPos - 1), -1);
+  Minor := StrToIntDef(Copy(S, DotPos + 1, Length(S)), -1);
+  Result := (Major >= 0) and (Minor >= 0);
+end;
+
+{--- 目录下是否存在版本 >= 需求的共享框架（同 Major.Minor，Patch 向上兼容） ---}
+function DirHasVersionAtLeast(Dir: String; RequiredVersion: String): Boolean;
+var
+  FindRec: TFindRec;
+  Major: Integer;
+  Minor: Integer;
+  ReqMajor: Integer;
+  ReqMinor: Integer;
+begin
+  Result := False;
+  if not ParseMajorMinor(RequiredVersion, ReqMajor, ReqMinor) then
+    exit;
+  if FindFirst(Dir + '\*', FindRec) then
+  begin
+    try
+      repeat
+        { FILE_ATTRIBUTE_DIRECTORY = 16 }
+        if (FindRec.Attributes and 16) <> 0 then
+        begin
+          if ParseMajorMinor(FindRec.Name, Major, Minor) then
+          begin
+            if (Major > ReqMajor) or ((Major = ReqMajor) and (Minor >= ReqMinor)) then
+            begin
+              Result := True;
+              exit;
+            end;
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+{{ for p in prerequisites }}
+
+{--- {{ p.name }} ---}
+function Is{{ p.id }}Installed: Boolean;
+var
+  SharedDir: String;
+begin
+  SharedDir := ExpandConstant('{win}\dotnet\shared\{{ p.frameworkDir }}');
+  Result := DirectoryExists(SharedDir) and DirHasVersionAtLeast(SharedDir, '{{ p.version }}');
+end;
+
+procedure Install{{ p.id }};
+var
+  ResultCode: Integer;
+  InstallerPath: String;
+begin
+  InstallerPath := ExpandConstant('{tmp}\{{ p.installerFileName }}');
+  if not FileExists(InstallerPath) then
+  begin
+    RaiseException('{{ p.name }} 安装文件缺失：' + InstallerPath);
+    exit;
+  end;
+  if Exec(InstallerPath, '{{ p.installArguments }}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if ResultCode = DotNetRebootCode then
+      DotNetRebootRequired := True
+    else if ResultCode <> DotNetSuccessCode then
+      RaiseException('安装 {{ p.name }} 失败（退出码 ' + IntToStr(ResultCode) + '）');
+  end
+  else
+    RaiseException('无法启动 {{ p.name }} 安装程序');
+end;
+
+procedure InstallPrerequisite{{ p.id }};
+begin
+  if not Is{{ p.id }}Installed then
+  begin
+    Install{{ p.id }};
+    { 安装后重新检测：未通过则禁止继续安装应用 }
+    if not Is{{ p.id }}Installed then
+      RaiseException('{{ p.name }} 安装后检测仍未通过');
+  end;
+end;
+{{ end }}
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+  begin
+{{ for p in prerequisites }}
+    InstallPrerequisite{{ p.id }};
+{{ end }}
+  end;
+end;
+
+function NeedRestart: Boolean;
+begin
+  Result := DotNetRebootRequired;
+end;
+{{ end }}

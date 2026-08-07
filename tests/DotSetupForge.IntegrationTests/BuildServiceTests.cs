@@ -49,8 +49,13 @@ public class BuildServiceTests : IDisposable
     public async Task Build_Without_Iscc_Should_Fail_With_DP3002()
     {
         var service = new BuildService();
+        // Mode=None：跳过 Runtime 准备（避免依赖网络），直接走到 ISCC 步骤
+        var project = new PackageProject
+        {
+            Runtime = new RuntimeInfo { Mode = RuntimeDeploymentMode.None },
+        };
 
-        var result = await service.BuildAsync(new BuildRequest(_tempDir));
+        var result = await service.BuildAsync(new BuildRequest(_tempDir, project));
 
         // 本机未安装 Inno Setup：错误 DP3002；若已安装则编译成功或 DP3001
         if (new DotSetupForge.Inno.InnoSetupLocator().Locate().Found)

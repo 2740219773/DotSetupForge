@@ -15,6 +15,12 @@ public sealed record CachedRuntime(
     string Directory)
 {
     public string InstallerPath => Path.Combine(Directory, FileName);
+
+    /// <summary>还原为安装包定义（供 prerequisite 构建使用）。</summary>
+    public RuntimeDefinition ToDefinition() => new(
+        Family, Version, Architecture,
+        $"{Family} {Version} {Architecture}",
+        Url, FileName, Sha256);
 }
 
 /// <summary>
@@ -29,6 +35,7 @@ public sealed class RuntimeCache
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
     public string RootDirectory { get; }

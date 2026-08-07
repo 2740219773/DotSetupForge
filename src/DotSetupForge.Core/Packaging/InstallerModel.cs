@@ -36,6 +36,19 @@ public sealed record ShortcutModel(
     bool Desktop,
     bool StartMenu);
 
+/// <summary>前置依赖检测方式。</summary>
+public enum PrerequisiteDetection
+{
+    /// <summary>不检测，总是安装。</summary>
+    None,
+
+    /// <summary>检测 .NET 共享框架目录（如 Microsoft.WindowsDesktop.App）。</summary>
+    FrameworkDirectory,
+
+    /// <summary>通过命令检测（预留）。</summary>
+    Command,
+}
+
 /// <summary>前置依赖。</summary>
 public sealed record PrerequisiteModel(
     string Id,
@@ -45,7 +58,10 @@ public sealed record PrerequisiteModel(
     string InstallerFileName,
     string InstallArguments,
     IReadOnlyList<int> SuccessExitCodes,
-    IReadOnlyList<int> RebootExitCodes);
+    IReadOnlyList<int> RebootExitCodes,
+    PrerequisiteDetection Detection = PrerequisiteDetection.None,
+    string? DetectionPath = null,
+    string? SourcePath = null);
 
 /// <summary>注册表条目。</summary>
 public sealed record RegistryEntryModel(

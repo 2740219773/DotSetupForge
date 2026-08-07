@@ -122,4 +122,56 @@ public class InnoScriptGeneratorTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    private static InstallerModel CreateModelWithRuntimePrerequisite() => CreateModel() with
+    {
+        Prerequisites =
+        [
+            new PrerequisiteModel(
+                Id: "dotnet-windowsdesktop-10.0.1-x64",
+                Name: ".NET Desktop Runtime 10.0.1 X64",
+                Version: "10.0.1",
+                Architecture: TargetArchitecture.X64,
+                InstallerFileName: "windowsdesktop-runtime-10.0.1-win-x64.exe",
+                InstallArguments: "/install /quiet /norestart",
+                SuccessExitCodes: [0],
+                RebootExitCodes: [3010],
+                Detection: PrerequisiteDetection.FrameworkDirectory,
+                DetectionPath: "Microsoft.WindowsDesktop.App",
+                SourcePath: @"D:\cache\windowsdesktop-runtime-10.0.1-win-x64.exe"),
+        ],
+    };
+
+    [Fact]
+    public void Generate_With_RuntimePrerequisite_Should_Emit_Code_Section()
+    {
+        var script = new InnoScriptGenerator().Generate(CreateModelWithRuntimePrerequisite(), Options());
+
+        Assert.Contains("[Code]", script);
+        Assert.Contains("function Isdotnetwindowsdesktop1001x64Installed: Boolean", script);
+        Assert.Contains("ExpandConstant('{win}\\dotnet\\shared\\Microsoft.WindowsDesktop.App')", script);
+        Assert.Contains("procedure InstallPrerequisitedotnetwindowsdesktop1001x64", script);
+        Assert.Contains("'/install /quiet /norestart'", script);
+        Assert.Contains("if CurStep = ssInstall then", script);
+        Assert.Contains("function NeedRestart: Boolean", script);
+        Assert.Contains("DotNetRebootCode = 3010", script);
+    }
+
+    [Fact]
+    public void Generate_With_RuntimePrerequisite_Should_Emit_DontCopy_File_Entry()
+    {
+        var script = new InnoScriptGenerator().Generate(CreateModelWithRuntimePrerequisite(), Options());
+
+        Assert.Contains(
+            @"Source: ""D:\cache\windowsdesktop-runtime-10.0.1-win-x64.exe""; DestDir: ""{tmp}""; Flags: dontcopy",
+            script);
+    }
+
+    [Fact]
+    public void Generate_Without_Prerequisite_Should_Not_Emit_Code_Section()
+    {
+        var script = new InnoScriptGenerator().Generate(CreateModel(), Options());
+
+        Assert.DoesNotContain("[Code]", script);
+    }
 }

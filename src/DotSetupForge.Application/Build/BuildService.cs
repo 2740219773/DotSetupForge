@@ -1,7 +1,10 @@
 using DotSetupForge.Application.Analysis;
 using DotSetupForge.Application.Packaging;
+using DotSetupForge.Application.Runtime;
+using DotSetupForge.Core.Analysis;
 using DotSetupForge.Core.Models;
 using DotSetupForge.Core.Packaging;
+using DotSetupForge.Core.Runtime;
 using DotSetupForge.Inno;
 
 namespace DotSetupForge.Application.Build;
@@ -12,11 +15,13 @@ public sealed record BuildRequest(
     PackageProject? Project = null,
     string? OutputDirectory = null);
 
-/// <summary>构建工作流：分析 → InstallerModel → installer.iss → ISCC 编译。</summary>
+/// <summary>构建工作流：分析 → Runtime 准备 → InstallerModel → installer.iss → ISCC 编译。</summary>
 public sealed class BuildService
 {
     private readonly ApplicationAnalysisService _analysis = new();
     private readonly InstallerModelBuilder _modelBuilder = new();
+    private readonly RuntimeService _runtime = new();
+    private readonly RuntimePrerequisiteBuilder _prerequisiteBuilder = new();
     private readonly InnoScriptGenerator _scriptGenerator = new();
     private readonly InnoSetupLocator _locator = new();
     private readonly InnoCompiler _compiler = new();
@@ -37,11 +42,41 @@ public sealed class BuildService
             return BuildResult.Fail(analysis.Diagnostics, DateTime.UtcNow - started);
         }
 
-        // 2. 构建安装模型
+        // 2. Runtime 准备（智能离线：确保缓存）
+        var runtimeDefinition = (RuntimeDefinition?)null;
+        RuntimeDownloadResult? runtimeResult = null;
+        if (ShouldEmbedRuntime(request.Project, analysis))
+        {
+            progress?.Report("准备 .NET Runtime...");
+            var requirement = RuntimeRequirementFactory.FromAnalysis(analysis);
+            runtimeResult = await _runtime.EnsureAsync(requirement, null, ct).ConfigureAwait(false);
+            if (!runtimeResult.Success || runtimeResult.Definition is null)
+            {
+                return BuildResult.Fail(runtimeResult.Errors, DateTime.UtcNow - started);
+            }
+
+            runtimeDefinition = runtimeResult.Definition;
+            progress?.Report(runtimeResult.FromCache
+                ? $"Runtime 命中缓存：{runtimeResult.InstallerPath}"
+                : $"Runtime 已下载：{runtimeResult.InstallerPath}");
+        }
+
+        // 3. 构建安装模型
         progress?.Report("构建安装模型...");
         var model = _modelBuilder.Build(analysis, request.Project);
 
-        // 3. 生成 Inno 脚本
+        if (runtimeDefinition is not null && runtimeResult is not null)
+        {
+            var requirement = RuntimeRequirementFactory.FromAnalysis(analysis);
+            var prerequisite = _prerequisiteBuilder.Build(requirement, runtimeDefinition)
+                with { SourcePath = runtimeResult.InstallerPath };
+            model = model with
+            {
+                Prerequisites = model.Prerequisites.Append(prerequisite).ToList(),
+            };
+        }
+
+        // 4. 生成 Inno 脚本
         var outputDirectory = request.OutputDirectory
             ?? (request.Project is null
                 ? Path.Combine(Directory.GetCurrentDirectory(), "dist")
@@ -93,5 +128,19 @@ public sealed class BuildService
 
         progress?.Report($"完成：{artifact}");
         return BuildResult.Ok(DateTime.UtcNow - started, artifact);
+    }
+
+    /// <summary>是否内嵌运行时：Framework-dependent 且部署模式为智能离线/在线。</summary>
+    private static bool ShouldEmbedRuntime(
+        PackageProject? project,
+        ApplicationAnalysisResult analysis)
+    {
+        if (analysis.DeploymentMode != DeploymentMode.FrameworkDependent)
+        {
+            return false;
+        }
+
+        var mode = project?.Runtime.Mode ?? RuntimeDeploymentMode.SmartOffline;
+        return mode is RuntimeDeploymentMode.SmartOffline or RuntimeDeploymentMode.Online;
     }
 }

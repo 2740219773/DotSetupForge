@@ -17,14 +17,15 @@ public sealed record RuntimeDownloadResult(
     bool Success,
     string? InstallerPath,
     bool FromCache,
+    RuntimeDefinition? Definition,
     IReadOnlyList<DotSetupForge.Core.Models.DiagnosticMessage> Errors)
 {
-    public static RuntimeDownloadResult Cached(string installerPath) =>
-        new(true, installerPath, true, []);
+    public static RuntimeDownloadResult Cached(string installerPath, RuntimeDefinition definition) =>
+        new(true, installerPath, true, definition, []);
 
-    public static RuntimeDownloadResult Downloaded(string installerPath) =>
-        new(true, installerPath, false, []);
+    public static RuntimeDownloadResult Downloaded(string installerPath, RuntimeDefinition definition) =>
+        new(true, installerPath, false, definition, []);
 
     public static RuntimeDownloadResult Failed(IReadOnlyList<DotSetupForge.Core.Models.DiagnosticMessage> errors) =>
-        new(false, null, false, errors);
+        new(false, null, false, null, errors);
 }

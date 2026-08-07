@@ -18,7 +18,11 @@ public sealed class InnoScriptGenerator
     /// <summary>渲染完整 installer.iss 文本。</summary>
     public string Generate(InstallerModel model, InnoScriptOptions options)
     {
-        // 注：不使用嵌套对象（Scriban 对 record 直接 string 属性访问异常），全部扁平化为字典
+        var prerequisites = model.Prerequisites
+            .Where(p => p.Detection == PrerequisiteDetection.FrameworkDirectory)
+            .Select(ToPrerequisiteViewModel)
+            .ToList();
+
         var data = new Dictionary<string, object?>
         {
             ["appId"] = $"{{{{{model.Product.AppId}}}}}", // Inno 要求 AppId={{GUID}} 双花括号
@@ -34,6 +38,10 @@ public sealed class InnoScriptGenerator
             ["mainExecutable"] = model.MainExecutable,
             ["productName"] = model.Product.Name,
             ["launchAfterInstall"] = model.LaunchAfterInstall,
+            ["hasPrerequisites"] = prerequisites.Count > 0,
+            ["prerequisites"] = prerequisites,
+            ["successCode"] = model.Prerequisites.FirstOrDefault()?.SuccessExitCodes.FirstOrDefault() ?? 0,
+            ["rebootCode"] = model.Prerequisites.FirstOrDefault()?.RebootExitCodes.FirstOrDefault() ?? 3010,
         };
 
         var parts = new List<string>
@@ -41,9 +49,9 @@ public sealed class InnoScriptGenerator
             Render("Setup.sbn", data),
         };
 
-        if (model.Files.Count > 0)
+        if (model.Files.Count > 0 || prerequisites.Count > 0)
         {
-            parts.Add(Render("Files.sbn", data));
+            parts.Add(RenderFiles(model, prerequisites, data));
         }
 
         if (model.Shortcuts.Count > 0)
@@ -56,7 +64,43 @@ public sealed class InnoScriptGenerator
             parts.Add(Render("Run.sbn", data));
         }
 
+        if (prerequisites.Count > 0)
+        {
+            parts.Add(Render("Code.sbn", data));
+        }
+
         return string.Join(Environment.NewLine + Environment.NewLine, parts);
+    }
+
+    /// <summary>渲染 [Files] 段：应用文件 + 前置依赖安装包（dontcopy，仅提取到 {tmp}）。</summary>
+    private static string RenderFiles(
+        InstallerModel model,
+        IReadOnlyList<object> prerequisites,
+        Dictionary<string, object?> data)
+    {
+        var rendered = Render("Files.sbn", data).TrimEnd();
+
+        var prerequisiteLines = new List<string>();
+        foreach (var p in prerequisites.OfType<Dictionary<string, object?>>())
+        {
+            var sourcePath = (string?)p["sourcePath"];
+            var fileName = (string?)p["installerFileName"];
+            if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(fileName))
+            {
+                continue;
+            }
+
+            prerequisiteLines.Add(
+                $"Source: \"{sourcePath}\"; DestDir: \"{{tmp}}\"; Flags: dontcopy" +
+                $"  ; {fileName}");
+        }
+
+        if (prerequisiteLines.Count == 0)
+        {
+            return rendered;
+        }
+
+        return rendered + Environment.NewLine + string.Join(Environment.NewLine, prerequisiteLines);
     }
 
     /// <summary>生成并写入 installer.iss，返回脚本文本与文件路径。</summary>
@@ -128,6 +172,30 @@ public sealed class InnoScriptGenerator
             ["fullName"] = $"{location}\\{shortcut.Name}",
             ["target"] = target,
         };
+    }
+
+    private static object ToPrerequisiteViewModel(PrerequisiteModel p)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["id"] = SanitizeIdentifier(p.Id),
+            ["name"] = p.Name,
+            ["version"] = p.Version,
+            ["installerFileName"] = p.InstallerFileName,
+            ["installArguments"] = p.InstallArguments,
+            ["frameworkDir"] = p.DetectionPath ?? "Microsoft.NETCore.App",
+            ["sourcePath"] = p.SourcePath,
+        };
+    }
+
+    /// <summary>Pascal 标识符：仅保留字母数字。</summary>
+    internal static string SanitizeIdentifier(string id)
+    {
+        var chars = id.Where(char.IsLetterOrDigit).ToArray();
+        var result = new string(chars);
+        return result.Length == 0 || !char.IsLetter(result[0])
+            ? "Prereq" + result
+            : result;
     }
 
     internal static string BuildDestDir(InstallerFile file)

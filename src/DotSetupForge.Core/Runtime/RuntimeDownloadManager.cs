@@ -29,7 +29,7 @@ public sealed class RuntimeDownloadManager
         var cached = _cache.Find(requirement);
         if (cached is not null)
         {
-            return RuntimeDownloadResult.Cached(cached.InstallerPath);
+            return RuntimeDownloadResult.Cached(cached.InstallerPath, cached.ToDefinition());
         }
 
         // 2. 解析下载定义
@@ -74,7 +74,7 @@ public sealed class RuntimeDownloadManager
 
             // 5. 落入缓存
             var saved = _cache.Save(definition, installerFile);
-            return RuntimeDownloadResult.Downloaded(saved.InstallerPath);
+            return RuntimeDownloadResult.Downloaded(saved.InstallerPath, definition);
         }
         finally
         {
