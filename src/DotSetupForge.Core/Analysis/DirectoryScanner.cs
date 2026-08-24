@@ -7,6 +7,10 @@ namespace DotSetupForge.Core.Analysis;
 public sealed class DirectoryScanner
 {
     private static readonly string[] NativeDirs = ["runtimes", "native"];
+    private static readonly HashSet<string> ConfigurationExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".config", ".ini", ".json", ".toml", ".xml", ".yaml", ".yml" };
+    private static readonly HashSet<string> DataExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".db", ".db3", ".mdf", ".sqlite", ".sqlite3" };
 
     /// <summary>扫描目录。目录不存在时返回失败结果。</summary>
     public IReadOnlyList<ScannedFile> Scan(string directory)
@@ -54,12 +58,21 @@ public sealed class DirectoryScanner
             return FileCategory.Log;
         }
 
+        if (DataExtensions.Contains(extension))
+        {
+            return FileCategory.Data;
+        }
+
+        if (ConfigurationExtensions.Contains(extension))
+        {
+            return FileCategory.Configuration;
+        }
+
         return extension switch
         {
             ".exe" => FileCategory.Application,
             ".dll" => IsRuntimeFile(relative) ? FileCategory.Runtime : FileCategory.Library,
             ".pdb" => FileCategory.Debug,
-            ".json" or ".config" => FileCategory.Configuration,
             _ => FileCategory.Unknown,
         };
     }

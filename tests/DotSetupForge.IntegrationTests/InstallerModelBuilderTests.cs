@@ -83,6 +83,7 @@ public class InstallerModelBuilderTests
         Assert.Equal(UninstallPolicy.NeverUninstall, config.UninstallPolicy);
 
         var data = model.Files.Single(f => f.SourceRelativePath == "Data/config.dat");
+        Assert.Equal(UpgradePolicy.PreserveExisting, data.UpgradePolicy);
         Assert.Equal(UninstallPolicy.NeverUninstall, data.UninstallPolicy);
 
         var native = model.Files.Single(f => f.SourceRelativePath.StartsWith("runtimes/"));

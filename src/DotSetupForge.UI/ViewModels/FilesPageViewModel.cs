@@ -335,7 +335,7 @@ public partial class FilesPageViewModel : ObservableObject, IProjectPageViewMode
         category switch
         {
             FileCategory.Configuration => ("应用目录 {app}", "升级时保留现有文件", "卸载时保留"),
-            FileCategory.Data => ("应用目录 {app}", "每次升级覆盖", "卸载时保留"),
+            FileCategory.Data => ("应用目录 {app}", "升级时保留现有文件", "卸载时保留"),
             FileCategory.Log or FileCategory.Debug => ("应用目录 {app}", "升级时删除", "卸载时删除"),
             _ => ("应用目录 {app}", "每次升级覆盖", "卸载时删除"),
         };

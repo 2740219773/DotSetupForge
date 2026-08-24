@@ -115,7 +115,9 @@ public sealed class InstallerModelBuilder
         var (location, upgrade, uninstall) = file.Category switch
         {
             FileCategory.Configuration => (InstallLocation.ApplicationDirectory, UpgradePolicy.PreserveExisting, UninstallPolicy.NeverUninstall),
-            FileCategory.Data => (InstallLocation.ApplicationDirectory, UpgradePolicy.OverwriteAlways, UninstallPolicy.NeverUninstall),
+            // Data 目录中的内容是用户运行期产生或维护的业务数据。首次安装仍会写入
+            // 发布包附带的初始数据；之后升级仅在目标文件不存在时补齐，绝不覆盖现场数据。
+            FileCategory.Data => (InstallLocation.ApplicationDirectory, UpgradePolicy.PreserveExisting, UninstallPolicy.NeverUninstall),
             FileCategory.Log or FileCategory.Debug => (InstallLocation.ApplicationDirectory, UpgradePolicy.DeleteOnUpgrade, UninstallPolicy.Delete),
             _ => (InstallLocation.ApplicationDirectory, UpgradePolicy.OverwriteAlways, UninstallPolicy.Delete),
         };
