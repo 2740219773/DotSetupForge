@@ -72,6 +72,18 @@ public partial class EditableProject : ObservableObject
     private bool _launchAfterInstall;
 
     [ObservableProperty]
+    private string _setupIconPath = string.Empty;
+
+    [ObservableProperty]
+    private string _wizardSmallImagePath = string.Empty;
+
+    [ObservableProperty]
+    private string _wizardImagePath = string.Empty;
+
+    [ObservableProperty]
+    private string _wizardTheme = nameof(InstallerWizardTheme.Stellar);
+
+    [ObservableProperty]
     private bool _allowUpgrade = true;
 
     // ---- 文件规则 ----
@@ -92,6 +104,9 @@ public partial class EditableProject : ObservableObject
         "Logs/**",
         "obj/**",
     ];
+
+    /// <summary>文件页中单独选中的目录，用于重载时恢复目录节点状态。</summary>
+    public ObservableCollection<string> SelectedDirectoryPaths { get; } = [];
 
     // ---- 签名 ----
 
@@ -118,33 +133,47 @@ public partial class EditableProject : ObservableObject
     private string _analysisSummary = string.Empty;
 
     /// <summary>从 Core 项目加载（拷贝而非引用，避免改坏原模型）。</summary>
-    public static EditableProject FromProject(PackageProject project) => new()
+    public static EditableProject FromProject(PackageProject project)
     {
-        AppId = project.Product.AppId,
-        ProductName = project.Product.Name,
-        Version = project.Product.Version,
-        Publisher = project.Product.Publisher,
-        MainExecutable = project.Product.MainExecutable,
-        SourcePath = project.Source.Path,
-        SourceType = project.Source.Type == DotSetupForge.Core.Models.SourceType.Project ? "项目" : "目录",
-        Configuration = project.Source.Configuration,
-        RuntimeFamily = project.Runtime.Family.ToString(),
-        RuntimeVersion = project.Runtime.Version,
-        RuntimeArchitecture = project.Runtime.Architecture.ToString(),
-        RuntimeMode = project.Runtime.Mode.ToString(),
-        AutoDetect = project.Runtime.AutoDetect,
-        InstallScope = project.Installer.Scope.ToString(),
-        InstallDirectory = project.Installer.InstallDirectory,
-        CreateDesktopShortcut = project.Installer.CreateDesktopShortcut,
-        CreateStartMenuShortcut = project.Installer.CreateStartMenuShortcut,
-        LaunchAfterInstall = project.Installer.LaunchAfterInstall,
-        AllowUpgrade = project.Installer.AllowUpgrade,
-        SigningEnabled = project.Signing.Enabled,
-        CertificatePath = project.Signing.CertificatePath,
-        TimestampServer = project.Signing.TimestampServer,
-        OutputDirectory = project.Output.Directory,
-        OutputFileName = project.Output.FileName,
-    };
+        var editable = new EditableProject
+        {
+            AppId = project.Product.AppId,
+            ProductName = project.Product.Name,
+            Version = project.Product.Version,
+            Publisher = project.Product.Publisher,
+            MainExecutable = project.Product.MainExecutable,
+            SourcePath = project.Source.Path,
+            SourceType = project.Source.Type == DotSetupForge.Core.Models.SourceType.Project ? "项目" : "目录",
+            Configuration = project.Source.Configuration,
+            RuntimeFamily = project.Runtime.Family.ToString(),
+            RuntimeVersion = project.Runtime.Version,
+            RuntimeArchitecture = project.Runtime.Architecture.ToString(),
+            RuntimeMode = project.Runtime.Mode.ToString(),
+            AutoDetect = project.Runtime.AutoDetect,
+            InstallScope = project.Installer.Scope.ToString(),
+            InstallDirectory = project.Installer.InstallDirectory,
+            CreateDesktopShortcut = project.Installer.CreateDesktopShortcut,
+            CreateStartMenuShortcut = project.Installer.CreateStartMenuShortcut,
+            LaunchAfterInstall = project.Installer.LaunchAfterInstall,
+            SetupIconPath = project.Installer.SetupIconPath,
+            WizardSmallImagePath = project.Installer.WizardSmallImagePath,
+            WizardImagePath = project.Installer.WizardImagePath,
+            WizardTheme = project.Installer.WizardTheme.ToString(),
+            AllowUpgrade = project.Installer.AllowUpgrade,
+            SigningEnabled = project.Signing.Enabled,
+            CertificatePath = project.Signing.CertificatePath,
+            TimestampServer = project.Signing.TimestampServer,
+            OutputDirectory = project.Output.Directory,
+            OutputFileName = project.Output.FileName,
+        };
+
+        // 文件页把目录选择固化为精确的包含/排除规则；必须完整回填，
+        // 否则重新打开项目会错误回退为 EditableProject 的默认规则。
+        SyncList(editable.IncludePatterns, project.Files.Include);
+        SyncList(editable.ExcludePatterns, project.Files.Exclude);
+        SyncList(editable.SelectedDirectoryPaths, project.Files.SelectedDirectoryPaths);
+        return editable;
+    }
 
     private static void SyncList(ObservableCollection<string> target, IEnumerable<string> source)
     {
@@ -175,6 +204,10 @@ public partial class EditableProject : ObservableObject
         CreateDesktopShortcut = other.CreateDesktopShortcut;
         CreateStartMenuShortcut = other.CreateStartMenuShortcut;
         LaunchAfterInstall = other.LaunchAfterInstall;
+        SetupIconPath = other.SetupIconPath;
+        WizardSmallImagePath = other.WizardSmallImagePath;
+        WizardImagePath = other.WizardImagePath;
+        WizardTheme = other.WizardTheme;
         AllowUpgrade = other.AllowUpgrade;
         SigningEnabled = other.SigningEnabled;
         CertificatePath = other.CertificatePath;
@@ -183,6 +216,7 @@ public partial class EditableProject : ObservableObject
         OutputFileName = other.OutputFileName;
         SyncList(IncludePatterns, other.IncludePatterns);
         SyncList(ExcludePatterns, other.ExcludePatterns);
+        SyncList(SelectedDirectoryPaths, other.SelectedDirectoryPaths);
         OnPropertyChanged(string.Empty);
     }
 
@@ -219,12 +253,18 @@ public partial class EditableProject : ObservableObject
             CreateDesktopShortcut = CreateDesktopShortcut,
             CreateStartMenuShortcut = CreateStartMenuShortcut,
             LaunchAfterInstall = LaunchAfterInstall,
+            SetupIconPath = SetupIconPath,
+            WizardSmallImagePath = WizardSmallImagePath,
+            WizardImagePath = WizardImagePath,
+            WizardTheme = Enum.TryParse<InstallerWizardTheme>(WizardTheme, out var wizardTheme)
+                ? wizardTheme : InstallerWizardTheme.Stellar,
             AllowUpgrade = AllowUpgrade,
         },
         Files = new FileOptions
         {
             Include = IncludePatterns.ToList(),
             Exclude = ExcludePatterns.ToList(),
+            SelectedDirectoryPaths = SelectedDirectoryPaths.ToList(),
         },
         Signing = new SigningOptions
         {

@@ -27,8 +27,8 @@ public sealed class ReleaseMetadataParser
             var candidates = new List<JsonElement>();
             foreach (var release in releases.EnumerateArray())
             {
-                if (!release.TryGetProperty("version", out var versionProp) ||
-                    !Version.TryParse(versionProp.GetString(), out var version))
+                if (!TryGetReleaseVersion(release, out var versionText) ||
+                    !Version.TryParse(versionText, out var version))
                 {
                     continue;
                 }
@@ -40,7 +40,7 @@ public sealed class ReleaseMetadataParser
             }
 
             foreach (var release in candidates
-                         .OrderByDescending(r => Version.Parse(r.GetProperty("version").GetString()!)))
+                         .OrderByDescending(r => Version.Parse(GetReleaseVersion(r))))
             {
                 var definition = FindFileInRelease(release, requirement, rid);
                 if (definition is not null)
@@ -62,8 +62,8 @@ public sealed class ReleaseMetadataParser
         RuntimeRequirement requirement,
         string rid)
     {
-        var versionText = release.GetProperty("version").GetString() ?? string.Empty;
-        if (!Version.TryParse(versionText, out var version))
+        if (!TryGetReleaseVersion(release, out var versionText) ||
+            !Version.TryParse(versionText, out var version))
         {
             return null;
         }
@@ -95,9 +95,7 @@ public sealed class ReleaseMetadataParser
                 }
 
                 var name = nameProp.GetString() ?? string.Empty;
-                if (!name.StartsWith(filePrefix, StringComparison.OrdinalIgnoreCase) ||
-                    !name.Contains(rid, StringComparison.OrdinalIgnoreCase) ||
-                    !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                if (!IsWindowsInstaller(name, filePrefix, rid))
                 {
                     continue;
                 }
@@ -121,6 +119,41 @@ public sealed class ReleaseMetadataParser
 
         return null;
     }
+
+    /// <summary>兼容旧版 <c>version</c> 与当前官方元数据的 <c>release-version</c> 字段。</summary>
+    private static bool TryGetReleaseVersion(JsonElement release, out string version)
+    {
+        foreach (var propertyName in new[] { "release-version", "version" })
+        {
+            if (release.TryGetProperty(propertyName, out var property) &&
+                !string.IsNullOrWhiteSpace(property.GetString()))
+            {
+                version = property.GetString()!;
+                return true;
+            }
+        }
+
+        version = string.Empty;
+        return false;
+    }
+
+    private static string GetReleaseVersion(JsonElement release)
+    {
+        _ = TryGetReleaseVersion(release, out var version);
+        return version;
+    }
+
+    /// <summary>
+    /// Microsoft release metadata has used both versioned installer names
+    /// (<c>windowsdesktop-runtime-10.0.1-win-x64.exe</c>) and current RID-only
+    /// names (<c>windowsdesktop-runtime-win-x64.exe</c>). The release version is
+    /// authoritative in the parent release entry, so both forms are valid.
+    /// </summary>
+    private static bool IsWindowsInstaller(string name, string filePrefix, string rid) =>
+        name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+        && (name.Equals($"{filePrefix}{rid}.exe", StringComparison.OrdinalIgnoreCase)
+            || (name.StartsWith(filePrefix, StringComparison.OrdinalIgnoreCase)
+                && name.Contains(rid, StringComparison.OrdinalIgnoreCase)));
 
     private static (int Major, int Minor) ParseMajorMinor(string version)
     {

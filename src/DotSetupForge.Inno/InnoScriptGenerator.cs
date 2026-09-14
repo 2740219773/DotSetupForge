@@ -1,4 +1,6 @@
+using System.IO;
 using DotSetupForge.Core.Packaging;
+using DotSetupForge.Core.Models;
 using Scriban;
 
 namespace DotSetupForge.Inno;
@@ -15,13 +17,16 @@ public sealed record InnoScriptResult(string Script, string IssPath);
 /// <summary>Inno Setup 脚本生成器：InstallerModel → Scriban 模板 → installer.iss。</summary>
 public sealed class InnoScriptGenerator
 {
+    private const string ShortcutIconFileName = "DotSetupForge.Shortcut.ico";
+
     /// <summary>渲染完整 installer.iss 文本。</summary>
     public string Generate(InstallerModel model, InnoScriptOptions options)
     {
         var prerequisites = model.Prerequisites
-            .Where(p => p.Detection == PrerequisiteDetection.FrameworkDirectory)
+            .Where(p => p.Detection is PrerequisiteDetection.FrameworkDirectory or PrerequisiteDetection.NetFrameworkRelease)
             .Select(ToPrerequisiteViewModel)
             .ToList();
+        var usesPreferredDataDrive = UsesPreferredDataDriveDefault(model);
 
         var data = new Dictionary<string, object?>
         {
@@ -29,7 +34,17 @@ public sealed class InnoScriptGenerator
             ["appName"] = model.Product.Name,
             ["appVersion"] = model.Product.Version,
             ["appPublisher"] = model.Product.Publisher,
-            ["installDirectory"] = model.InstallDirectory,
+            ["installDirectory"] = usesPreferredDataDrive
+                ? $"{{code:GetPreferredDataDriveInstallDir|{BuildInstallSubdirectory(model.Product)}}}"
+                : model.InstallDirectory,
+            ["hasSetupIcon"] = !string.IsNullOrWhiteSpace(model.SetupIconPath),
+            ["setupIconFile"] = model.SetupIconPath,
+            ["hasWizardSmallImage"] = !string.IsNullOrWhiteSpace(model.WizardSmallImagePath),
+            ["wizardSmallImageFile"] = model.WizardSmallImagePath,
+            ["hasWizardImage"] = !string.IsNullOrWhiteSpace(model.WizardImagePath),
+            ["wizardImageFile"] = model.WizardImagePath,
+            ["wizardStyle"] = GetWizardStyle(model.WizardTheme),
+            ["uninstallDisplayIcon"] = model.SetupIconPath,
             ["privilegesRequired"] = options.PrivilegesRequired,
             ["outputDirectory"] = options.OutputDirectory,
             ["outputBaseFilename"] = options.OutputBaseFilename,
@@ -39,6 +54,10 @@ public sealed class InnoScriptGenerator
             ["productName"] = model.Product.Name,
             ["launchAfterInstall"] = model.LaunchAfterInstall,
             ["hasPrerequisites"] = prerequisites.Count > 0,
+            ["hasPreferredDataDrive"] = usesPreferredDataDrive,
+            ["hasUpgradeHandling"] = model.Upgrade.Enabled,
+            ["uninstallKey"] = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{{{model.Product.AppId}}}_is1",
+            ["productVersion"] = model.Product.Version,
             ["prerequisites"] = prerequisites,
             ["successCode"] = model.Prerequisites.FirstOrDefault()?.SuccessExitCodes.FirstOrDefault() ?? 0,
             ["rebootCode"] = model.Prerequisites.FirstOrDefault()?.RebootExitCodes.FirstOrDefault() ?? 3010,
@@ -49,7 +68,7 @@ public sealed class InnoScriptGenerator
             Render("Setup.sbn", data),
         };
 
-        if (model.Files.Count > 0 || prerequisites.Count > 0)
+        if (model.Files.Count > 0 || prerequisites.Count > 0 || !string.IsNullOrWhiteSpace(model.SetupIconPath))
         {
             parts.Add(RenderFiles(model, prerequisites, data));
         }
@@ -64,13 +83,22 @@ public sealed class InnoScriptGenerator
             parts.Add(Render("Run.sbn", data));
         }
 
-        if (prerequisites.Count > 0)
+        if (prerequisites.Count > 0 || usesPreferredDataDrive || model.Upgrade.Enabled)
         {
             parts.Add(Render("Code.sbn", data));
         }
 
         return string.Join(Environment.NewLine + Environment.NewLine, parts);
     }
+
+    private static string GetWizardStyle(InstallerWizardTheme theme) => theme switch
+    {
+        InstallerWizardTheme.Slate => "modern dynamic slate includetitlebar",
+        InstallerWizardTheme.Zircon => "modern zircon includetitlebar",
+        InstallerWizardTheme.ModernLight => "modern dynamic windows11 includetitlebar",
+        // Inno Setup 6.7 ships Polar as the dark blue built-in style; keep the product name Stellar.
+        _ => "modern dynamic polar includetitlebar",
+    };
 
     /// <summary>渲染 [Files] 段：应用文件 + 前置依赖安装包（dontcopy，仅提取到 {tmp}）。</summary>
     private static string RenderFiles(
@@ -91,17 +119,24 @@ public sealed class InnoScriptGenerator
             }
 
             prerequisiteLines.Add(
-                $"Source: \"{sourcePath}\"; DestDir: \"{{tmp}}\"; Flags: dontcopy" +
-                $"  ; {fileName}");
+                $"Source: \"{sourcePath}\"; DestDir: \"{{tmp}}\"; Flags: dontcopy");
         }
 
         if (prerequisiteLines.Count == 0)
         {
-            return rendered;
+            return AppendShortcutIconFile(rendered, model.SetupIconPath);
         }
 
-        return rendered + Environment.NewLine + string.Join(Environment.NewLine, prerequisiteLines);
+        return AppendShortcutIconFile(
+            rendered + Environment.NewLine + string.Join(Environment.NewLine, prerequisiteLines),
+            model.SetupIconPath);
     }
+
+    private static string AppendShortcutIconFile(string rendered, string setupIconPath) =>
+        string.IsNullOrWhiteSpace(setupIconPath)
+            ? rendered
+            : rendered + Environment.NewLine +
+              $"Source: \"{setupIconPath}\"; DestDir: \"{{app}}\"; DestName: \"{ShortcutIconFileName}\"; Flags: ignoreversion";
 
     /// <summary>生成并写入 installer.iss，返回脚本文本与文件路径。</summary>
     public InnoScriptResult GenerateToFile(
@@ -160,6 +195,19 @@ public sealed class InnoScriptGenerator
         };
     }
 
+    private static bool UsesPreferredDataDriveDefault(InstallerModel model) =>
+        string.Equals(
+            NormalizeDirectory(model.InstallDirectory),
+            NormalizeDirectory($@"D:\Apps\{BuildInstallSubdirectory(model.Product)}"),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildInstallSubdirectory(ProductModel product) =>
+        string.IsNullOrWhiteSpace(product.Publisher)
+            ? product.Name
+            : $"{product.Publisher}\\{product.Name}";
+
+    private static string NormalizeDirectory(string path) => path.TrimEnd('\\', '/');
+
     private static object ToShortcutViewModel(ShortcutModel shortcut, InstallerModel model)
     {
         var location = shortcut.Desktop ? "{autodesktop}" : "{autoprograms}";
@@ -171,6 +219,8 @@ public sealed class InnoScriptGenerator
         {
             ["fullName"] = $"{location}\\{shortcut.Name}",
             ["target"] = target,
+            ["hasIcon"] = !string.IsNullOrWhiteSpace(shortcut.IconRelativePath) || !string.IsNullOrWhiteSpace(model.SetupIconPath),
+            ["iconPath"] = shortcut.IconRelativePath ?? ShortcutIconFileName,
         };
     }
 
@@ -183,6 +233,14 @@ public sealed class InnoScriptGenerator
             ["version"] = p.Version,
             ["installerFileName"] = p.InstallerFileName,
             ["installArguments"] = p.InstallArguments,
+            ["detection"] = p.Detection.ToString(),
+            ["releaseValue"] = p.DetectionPath ?? "0",
+            ["registryArchitecture"] = p.Architecture switch
+            {
+                DotSetupForge.Core.Models.TargetArchitecture.X86 => "x86",
+                DotSetupForge.Core.Models.TargetArchitecture.Arm64 => "arm64",
+                _ => "x64",
+            },
             ["frameworkDir"] = p.DetectionPath ?? "Microsoft.NETCore.App",
             ["sourcePath"] = p.SourcePath,
         };

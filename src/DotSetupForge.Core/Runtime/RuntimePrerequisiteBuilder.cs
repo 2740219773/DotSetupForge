@@ -39,4 +39,19 @@ public sealed class RuntimePrerequisiteBuilder
             Detection: PrerequisiteDetection.FrameworkDirectory,
             DetectionPath: frameworkDir);
     }
+
+    /// <summary>将已导入的 .NET Framework 4.x 离线包转换为安装器前置依赖。</summary>
+    public PrerequisiteModel BuildLegacyFramework(LegacyFrameworkPackage package, CachedLegacyFramework cached) =>
+        new(
+            Id: $"netframework-{package.Version.Replace('.', '-')}",
+            Name: package.DisplayName,
+            Version: package.Version,
+            Architecture: TargetArchitecture.AnyCpu,
+            InstallerFileName: package.InstallerFileName,
+            InstallArguments: package.InstallArguments,
+            SuccessExitCodes: package.SuccessExitCodes,
+            RebootExitCodes: package.RebootExitCodes,
+            Detection: PrerequisiteDetection.NetFrameworkRelease,
+            DetectionPath: package.ReleaseValue.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            SourcePath: cached.InstallerPath);
 }

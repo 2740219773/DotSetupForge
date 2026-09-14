@@ -3,6 +3,9 @@ namespace DotSetupForge.Core.Models;
 /// <summary>Runtime 家族。</summary>
 public enum RuntimeFamily
 {
+    /// <summary>旧式 .NET Framework（4.x）。</summary>
+    NetFramework,
+
     /// <summary>Microsoft.NETCore.App → .NET Runtime。</summary>
     DotNet,
 

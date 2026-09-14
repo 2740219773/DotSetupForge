@@ -21,4 +21,10 @@ public record FileOptions
         "Logs/**",
         "obj/**",
     ];
+
+    /// <summary>
+    /// 文件树中被单独选中的目录路径。它仅保存界面节点状态，不参与文件筛选：
+    /// 允许“目录选中、子文件未选中”的显示状态在重新打开项目后保持不变。
+    /// </summary>
+    public List<string> SelectedDirectoryPaths { get; init; } = [];
 }

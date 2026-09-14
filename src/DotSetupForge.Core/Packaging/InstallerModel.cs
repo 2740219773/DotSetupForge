@@ -45,6 +45,9 @@ public enum PrerequisiteDetection
     /// <summary>检测 .NET 共享框架目录（如 Microsoft.WindowsDesktop.App）。</summary>
     FrameworkDirectory,
 
+    /// <summary>通过 .NET Framework v4 Full Release 注册表值检测。</summary>
+    NetFrameworkRelease,
+
     /// <summary>通过命令检测（预留）。</summary>
     Command,
 }
@@ -85,8 +88,19 @@ public sealed record InstallerModel
 
     public InstallScope Scope { get; init; } = InstallScope.Machine;
 
-    /// <summary>默认安装目录，如 {autopf}\{Publisher}\{Name}。</summary>
+    public InstallerWizardTheme WizardTheme { get; init; } = InstallerWizardTheme.Stellar;
+
+    /// <summary>安装目录；默认优先 D:\Apps\{Publisher}\{Name}。</summary>
     public string InstallDirectory { get; init; } = string.Empty;
+
+    /// <summary>安装程序 EXE 的 ICO 图标文件路径。</summary>
+    public string SetupIconPath { get; init; } = string.Empty;
+
+    /// <summary>安装向导右上角品牌图（PNG 或 BMP）。</summary>
+    public string WizardSmallImagePath { get; init; } = string.Empty;
+
+    /// <summary>安装向导欢迎/完成页左侧品牌图（PNG 或 BMP）。</summary>
+    public string WizardImagePath { get; init; } = string.Empty;
 
     public string MainExecutable { get; init; } = string.Empty;
 

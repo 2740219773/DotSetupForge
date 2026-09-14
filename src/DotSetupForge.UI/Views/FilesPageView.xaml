@@ -47,8 +47,9 @@
                         </TreeView.ItemContainerStyle>
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                <StackPanel Orientation="Horizontal" Margin="0,2">
-                                    <CheckBox IsChecked="{Binding CheckedState, Mode=TwoWay}"
+                                <StackPanel Orientation="Horizontal" Margin="0,2"
+                                            MouseRightButtonUp="FileNode_MouseRightButtonUp">
+                                    <CheckBox IsChecked="{Binding CheckedState, Mode=OneWay}"
                                               IsThreeState="{Binding IsDirectory}"
                                               Click="FileCheckBox_Click"
                                               VerticalAlignment="Center" />

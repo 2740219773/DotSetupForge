@@ -82,7 +82,7 @@ public class ApplicationAnalyzerTests : IDisposable
 
         var result = _analyzer.Analyze(_tempDir);
 
-        Assert.True(result.Success);
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => $"{d.Code} {d.Message}")));
         Assert.Equal("FakeApp.exe", Path.GetFileName(result.MainExecutable));
         Assert.Equal("FakeApp", result.ApplicationName);
         Assert.Equal(ApplicationType.Wpf, result.ApplicationType);
@@ -141,5 +141,27 @@ public class ApplicationAnalyzerTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Equal("Extra.exe", Path.GetFileName(result.MainExecutable));
+    }
+
+    [Fact]
+    public void Analyze_LegacyFrameworkExeConfig_Should_Detect_WinForms_Without_ModernRuntime()
+    {
+        var sample = typeof(ApplicationAnalyzerTests).Assembly.Location;
+        File.Copy(sample, Path.Combine(_tempDir, "LegacyApp.exe"));
+        WriteFile("LegacyApp.exe.config", """
+            <configuration>
+              <startup><supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.7.2" /></startup>
+            </configuration>
+            """);
+
+        var result = _analyzer.Analyze(_tempDir);
+
+        Assert.True(result.Success, string.Join("; ", result.Diagnostics.Select(d => $"{d.Code} {d.Message}")));
+        Assert.Equal("net472", result.TargetFramework);
+        Assert.Equal("Microsoft.NETFramework", result.FrameworkName);
+        Assert.Equal("4.7.2", result.FrameworkVersion);
+        Assert.Equal(".NET Framework 4.7.2", result.RuntimeName);
+        Assert.Equal(ApplicationType.WinForms, result.ApplicationType);
+        Assert.Equal(DeploymentMode.LegacyFramework, result.DeploymentMode);
     }
 }

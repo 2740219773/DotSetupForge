@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Content Include="bin\Debug\net10.0-windows\favicon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DotSetupForge.Application\DotSetupForge.Application.csproj" />
     <ProjectReference Include="..\DotSetupForge.Core\DotSetupForge.Core.csproj" />
   </ItemGroup>
@@ -9,12 +13,17 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="DotSetupForge.Core.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>bin\Debug\net10.0-windows\favicon.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>

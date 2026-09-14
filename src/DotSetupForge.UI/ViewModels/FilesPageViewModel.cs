@@ -96,7 +96,11 @@ public partial class FilesPageViewModel : ObservableObject, IProjectPageViewMode
 
         IsLoading = true;
         StatusText = "正在分析文件...";
-        var analysis = await Task.Run(() => _analysis.Analyze(directory));
+        var selectedDirectoryPaths = _project.SelectedDirectoryPaths.ToList();
+        var mainExecutable = string.IsNullOrWhiteSpace(_project.MainExecutable)
+            ? null
+            : _project.MainExecutable;
+        var analysis = await Task.Run(() => _analysis.Analyze(directory, mainExecutable));
 
         if (!analysis.Success)
         {
@@ -116,7 +120,7 @@ public partial class FilesPageViewModel : ObservableObject, IProjectPageViewMode
                 .Select(f => f.RelativePath.Replace('\\', '/').ToLowerInvariant())
                 .ToHashSet();
 
-            var nodes = BuildTree(analysis.Files, excludedSet);
+            var nodes = BuildTree(analysis.Files, excludedSet, selectedDirectoryPaths);
             return (nodes, result.Included.Count, result.Excluded.Count,
                 result.Included.Sum(f => f.Size));
         });
@@ -151,7 +155,10 @@ public partial class FilesPageViewModel : ObservableObject, IProjectPageViewMode
         return rules;
     }
 
-    private List<FileNode> BuildTree(IReadOnlyList<ScannedFile> files, HashSet<string> excludedSet)
+    private List<FileNode> BuildTree(
+        IReadOnlyList<ScannedFile> files,
+        HashSet<string> excludedSet,
+        IReadOnlyCollection<string> selectedDirectoryPaths)
     {
         var roots = new List<FileNode>();
         var dirs = new Dictionary<string, FileNode>(StringComparer.OrdinalIgnoreCase);
@@ -216,7 +223,25 @@ public partial class FilesPageViewModel : ObservableObject, IProjectPageViewMode
             dir.RefreshState();
         }
 
+        RestoreDirectorySelections(roots, selectedDirectoryPaths);
+
         return roots;
+    }
+
+    /// <summary>在叶子规则聚合后，恢复被单独选中的目录节点（不改变子文件状态）。</summary>
+    internal static void RestoreDirectorySelections(
+        IEnumerable<FileNode> roots,
+        IReadOnlyCollection<string> selectedDirectoryPaths)
+    {
+        var selectedDirectories = selectedDirectoryPaths
+            .Select(path => path.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var directory in roots.SelectMany(EnumerateDirectories).Where(directory =>
+                     selectedDirectories.Contains(directory.RelativePath.Replace('\\', '/'))))
+        {
+            directory.SetState(true, cascade: false);
+        }
     }
 
     // ================= 勾选交互 =================
@@ -230,36 +255,83 @@ public partial class FilesPageViewModel : ObservableObject, IProjectPageViewMode
             return;
         }
 
-        node.RefreshState();
+        // 目录操作曾写入 "directory/**"，它会覆盖随后对单个文件的重新包含。
+        // 每次用户操作都把当前树的最终叶子状态固化为精确规则，避免残留目录规则。
+        SynchronizeExcludePatterns(_project, RootNodes);
+        UpdateCounts();
+    }
 
-        foreach (var fileNode in node.EnumerateFiles())
+    internal static void SynchronizeExcludePatterns(EditableProject project, IEnumerable<FileNode> roots)
+    {
+        var rootNodes = roots.ToList();
+        var allNodes = rootNodes.SelectMany(root => root.EnumerateFiles()).ToList();
+        var directoryPatterns = rootNodes
+            .SelectMany(EnumerateDirectories)
+            .Select(directory => $"{directory.RelativePath.Replace('\\', '/')}/**")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var directories = rootNodes
+            .SelectMany(EnumerateDirectories)
+            .ToList();
+        var directoryPaths = directories
+            .Select(directory => directory.RelativePath.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var leafPaths = allNodes
+            .Select(file => file.RelativePath.Replace('\\', '/'))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = project.ExcludePatterns.Count - 1; index >= 0; index--)
+        {
+            var pattern = project.ExcludePatterns[index].Replace('\\', '/');
+            if (directoryPatterns.Contains(pattern) || leafPaths.Contains(pattern))
+            {
+                project.ExcludePatterns.RemoveAt(index);
+            }
+        }
+
+        foreach (var fileNode in allNodes.Where(file => file.CheckedState != true))
         {
             var pattern = fileNode.RelativePath.Replace('\\', '/');
-            if (fileNode.CheckedState == true)
+            if (!project.ExcludePatterns.Contains(pattern, StringComparer.OrdinalIgnoreCase))
             {
-                _project.ExcludePatterns.Remove(pattern);
-            }
-            else if (!_project.ExcludePatterns.Contains(pattern))
-            {
-                _project.ExcludePatterns.Add(pattern);
+                project.ExcludePatterns.Add(pattern);
             }
         }
 
-        // 目录级模式同步（供高级用户理解）
-        if (node.IsDirectory)
+        // 与文件排除规则分开保存目录节点本身的选择，避免重载时被叶子状态聚合掉。
+        for (var index = project.SelectedDirectoryPaths.Count - 1; index >= 0; index--)
         {
-            var dirPattern = $"{node.RelativePath.Replace('\\', '/')}/**";
-            if (node.CheckedState == true)
+            var path = project.SelectedDirectoryPaths[index].Replace('\\', '/');
+            if (directoryPaths.Contains(path))
             {
-                _project.ExcludePatterns.Remove(dirPattern);
-            }
-            else if (!_project.ExcludePatterns.Contains(dirPattern))
-            {
-                _project.ExcludePatterns.Add(dirPattern);
+                project.SelectedDirectoryPaths.RemoveAt(index);
             }
         }
 
-        UpdateCounts();
+        foreach (var directory in directories.Where(directory => directory.CheckedState == true))
+        {
+            var path = directory.RelativePath.Replace('\\', '/');
+            if (!project.SelectedDirectoryPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+            {
+                project.SelectedDirectoryPaths.Add(path);
+            }
+        }
+    }
+
+    private static IEnumerable<FileNode> EnumerateDirectories(FileNode node)
+    {
+        if (!node.IsDirectory)
+        {
+            yield break;
+        }
+
+        yield return node;
+        foreach (var child in node.Children)
+        {
+            foreach (var directory in EnumerateDirectories(child))
+            {
+                yield return directory;
+            }
+        }
     }
 
     private void UpdateCounts()

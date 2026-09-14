@@ -14,7 +14,7 @@
 
             <!-- 欢迎区 -->
             <StackPanel Margin="0,10,0,30">
-                <TextBlock Text="DotSetupForge" FontSize="30" FontWeight="Bold"
+                <TextBlock Text="全能打包助手" FontSize="30" FontWeight="Bold"
                            Foreground="{StaticResource TextPrimaryBrush}" />
                 <TextBlock Text="面向 .NET Windows 桌面程序的智能发布、依赖分析、环境部署与安装包生成工具"
                            FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}"
@@ -65,19 +65,16 @@
                 </Border>
 
                 <!-- 打开项目 -->
-                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Margin="8,0,0,0" Cursor="Hand">
-                    <Border.InputBindings>
-                        <MouseBinding MouseAction="LeftClick"
-                                      Command="{Binding OpenProjectFileCommand}" />
-                    </Border.InputBindings>
+                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Margin="8,0,0,0">
                     <StackPanel>
                         <TextBlock Text="打开项目文件" FontSize="14" FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock Text="打开已有的 *.pack.json 配置文件，继续编辑或重新构建。"
+                        <TextBlock Text="从工具项目目录或其他位置打开已有的 *.pack.json，继续编辑或重新构建。"
                                    FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" Margin="0,8,0,0" />
-                        <TextBlock Text=".pack.json" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
-                                   Margin="0,12,0,0" />
+                        <Button Content="从其他位置打开" Style="{StaticResource SecondaryButtonStyle}"
+                                HorizontalAlignment="Left" Margin="0,12,0,0"
+                                Command="{Binding OpenProjectFileCommand}" />
                     </StackPanel>
                 </Border>
             </Grid>

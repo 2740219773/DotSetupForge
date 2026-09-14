@@ -63,7 +63,7 @@ public sealed class RuntimeDownloadManager
             var expected = definition.Sha256;
             if (!string.IsNullOrEmpty(expected))
             {
-                var actual = await ComputeSha256Async(installerFile, ct).ConfigureAwait(false);
+                var actual = await ComputeHashAsync(installerFile, expected, ct).ConfigureAwait(false);
                 if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
                 {
                     return RuntimeDownloadResult.Failed(
@@ -74,6 +74,70 @@ public sealed class RuntimeDownloadManager
 
             // 5. 落入缓存
             var saved = _cache.Save(definition, installerFile);
+            return RuntimeDownloadResult.Downloaded(saved.InstallerPath, definition);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(workDir, recursive: true);
+            }
+            catch (IOException)
+            {
+                // 忽略清理失败
+            }
+        }
+    }
+
+    /// <summary>
+    /// 导入用户已经下载的官方 Runtime 安装器。始终依据当前官方元数据校验摘要，
+    /// 且只复制源文件，绝不移动或修改用户保留的安装器。
+    /// </summary>
+    public async Task<RuntimeDownloadResult> ImportAsync(
+        RuntimeRequirement requirement,
+        string installerFile,
+        CancellationToken ct = default)
+    {
+        if (!File.Exists(installerFile))
+        {
+            return RuntimeDownloadResult.Failed(
+                [DiagnosticMessage.Error("DP2001", "选择的 Runtime 安装文件不存在")]);
+        }
+
+        RuntimeDefinition? definition;
+        try
+        {
+            definition = await _catalog.ResolveAsync(requirement, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            return RuntimeDownloadResult.Failed(
+                [DiagnosticMessage.Error("DP2003", $"无法获取运行时元数据：{ex.Message}")]);
+        }
+
+        if (definition is null || string.IsNullOrEmpty(definition.Sha256))
+        {
+            return RuntimeDownloadResult.Failed(
+                [DiagnosticMessage.Error("DP2003", $"无法解析 {requirement.Family} {requirement.Version} {requirement.Architecture} 的校验信息")]);
+        }
+
+        var workDir = Path.Combine(Path.GetTempPath(), "DotSetupForge", $"runtime-import-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workDir);
+
+        try
+        {
+            var copiedInstaller = Path.Combine(workDir, definition.FileName);
+            File.Copy(installerFile, copiedInstaller, overwrite: true);
+
+            var actual = await ComputeHashAsync(copiedInstaller, definition.Sha256, ct).ConfigureAwait(false);
+            if (!actual.Equals(definition.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                return RuntimeDownloadResult.Failed(
+                    [DiagnosticMessage.Error("DP2002",
+                        $"本地 Runtime 文件校验失败：期望 {definition.Sha256}，实际 {actual}")]);
+            }
+
+            var saved = _cache.Save(definition, copiedInstaller);
             return RuntimeDownloadResult.Downloaded(saved.InstallerPath, definition);
         }
         finally
@@ -142,9 +206,20 @@ public sealed class RuntimeDownloadManager
         throw lastError ?? new HttpRequestException("下载失败");
     }
 
-    private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
+    /// <summary>
+    /// 官方 release metadata 的 hash 既可能是 SHA-256（64 个十六进制字符），
+    /// 也可能是 SHA-512（128 个十六进制字符）。按声明摘要长度选择算法，
+    /// 其他长度保持 SHA-256 比对并由调用方报告校验失败。
+    /// </summary>
+    private static async Task<string> ComputeHashAsync(
+        string path,
+        string expectedHash,
+        CancellationToken ct)
     {
         await using var stream = File.OpenRead(path);
-        return Convert.ToHexString(await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false));
+        var hash = expectedHash.Length == 128
+            ? await SHA512.HashDataAsync(stream, ct).ConfigureAwait(false)
+            : await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false);
+        return Convert.ToHexString(hash);
     }
 }

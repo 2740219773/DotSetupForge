@@ -9,7 +9,7 @@ public interface IDialogService
     string? PickFolder(string description);
 
     /// <summary>选择文件，取消返回 null。</summary>
-    string? PickFile(string title, string filter);
+    string? PickFile(string title, string filter, string? initialDirectory = null);
 
     /// <summary>确认对话框，返回是否确认。</summary>
     bool Confirm(string message, string title);
@@ -34,13 +34,14 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
-    public string? PickFile(string title, string filter)
+    public string? PickFile(string title, string filter, string? initialDirectory = null)
     {
         var dialog = new OpenFileDialog
         {
             Title = title,
             Filter = filter,
             CheckFileExists = true,
+            InitialDirectory = initialDirectory,
         };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }

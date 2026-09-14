@@ -45,6 +45,7 @@ public class InstallerModelBuilderTests
         Assert.Equal("FakeApp.exe", model.MainExecutable);
         Assert.Equal("FakeApp.exe", model.Product.MainExecutable);
         Assert.Equal(InstallScope.Machine, model.Scope);
+        Assert.Equal(@"D:\Apps\FakeApp", model.InstallDirectory);
     }
 
     [Fact]
@@ -110,6 +111,7 @@ public class InstallerModelBuilderTests
                 Scope = InstallScope.User,
                 CreateDesktopShortcut = false,
                 CreateStartMenuShortcut = false,
+                SetupIconPath = @"D:\assets\RHCVP.ico",
                 AllowUpgrade = false,
             },
         };
@@ -121,6 +123,7 @@ public class InstallerModelBuilderTests
         Assert.Equal("测试公司", model.Product.Publisher);
         Assert.Equal(InstallScope.User, model.Scope);
         Assert.Empty(model.Shortcuts);
+        Assert.Equal(@"D:\assets\RHCVP.ico", model.SetupIconPath);
         Assert.False(model.Upgrade.Enabled);
         Assert.Contains("RHCVP", model.InstallDirectory);
     }

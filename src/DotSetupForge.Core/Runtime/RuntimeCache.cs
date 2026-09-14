@@ -80,12 +80,18 @@ public sealed class RuntimeCache
     /// </summary>
     public CachedRuntime? Find(RuntimeRequirement requirement)
     {
-        var (major, minor) = ParseMajorMinor(requirement.Version);
+        if (!Version.TryParse(requirement.Version, out var requiredVersion))
+        {
+            return null;
+        }
 
         return List()
             .Where(c => c.Family == requirement.Family
                 && c.Architecture == requirement.Architecture
-                && SameMajorMinor(c.Version, major, minor))
+                && Version.TryParse(c.Version, out var cachedVersion)
+                && cachedVersion.Major == requiredVersion.Major
+                && cachedVersion.Minor == requiredVersion.Minor
+                && cachedVersion >= requiredVersion)
             .OrderByDescending(c => Version.TryParse(c.Version, out var v) ? v : new Version(0, 0))
             .FirstOrDefault();
     }
@@ -141,12 +147,4 @@ public sealed class RuntimeCache
         }
     }
 
-    private static (int Major, int Minor) ParseMajorMinor(string version)
-    {
-        var v = Version.TryParse(version, out var parsed) ? parsed : new Version(0, 0);
-        return (v.Major, v.Minor);
-    }
-
-    private static bool SameMajorMinor(string version, int major, int minor) =>
-        Version.TryParse(version, out var v) && v.Major == major && v.Minor == minor;
 }

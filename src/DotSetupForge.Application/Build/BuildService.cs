@@ -36,7 +36,7 @@ public sealed class BuildService
 
         // 1. 分析
         progress?.Report("分析应用...");
-        var analysis = _analysis.Analyze(request.SourceDirectory);
+        var analysis = _analysis.Analyze(request.SourceDirectory, request.Project?.Product.MainExecutable);
         if (!analysis.Success)
         {
             return BuildResult.Fail(analysis.Diagnostics, DateTime.UtcNow - started);
@@ -45,6 +45,7 @@ public sealed class BuildService
         // 2. Runtime 准备（智能离线：确保缓存）
         var runtimeDefinition = (RuntimeDefinition?)null;
         RuntimeDownloadResult? runtimeResult = null;
+        PrerequisiteModel? legacyPrerequisite = null;
         if (ShouldEmbedRuntime(request.Project, analysis))
         {
             progress?.Report("准备 .NET Runtime...");
@@ -59,6 +60,23 @@ public sealed class BuildService
             progress?.Report(runtimeResult.FromCache
                 ? $"Runtime 命中缓存：{runtimeResult.InstallerPath}"
                 : $"Runtime 已下载：{runtimeResult.InstallerPath}");
+        }
+
+        if (ShouldEmbedLegacyFramework(request.Project, analysis))
+        {
+            progress?.Report("检查 .NET Framework 离线缓存...");
+            var ensured = _runtime.EnsureLegacyFramework(analysis.FrameworkVersion);
+            var cached = ensured.Cached;
+            var package = cached is null ? null : _runtime.ResolveLegacyFramework(cached.Version);
+            if (cached is null || package is null)
+            {
+                diagnostics.Add(DiagnosticMessage.Error("DP2011",
+                    $"缺少 .NET Framework {analysis.FrameworkVersion} 离线安装器缓存。请在“运行环境”页导入与 ClickOnce Bootstrapper 定义匹配的完整 EXE。"));
+                return BuildResult.Fail(diagnostics, DateTime.UtcNow - started);
+            }
+
+            legacyPrerequisite = _prerequisiteBuilder.BuildLegacyFramework(package, cached);
+            progress?.Report($".NET Framework 命中缓存：{cached.InstallerPath}");
         }
 
         // 3. 构建安装模型
@@ -76,6 +94,11 @@ public sealed class BuildService
             };
         }
 
+        if (legacyPrerequisite is not null)
+        {
+            model = model with { Prerequisites = model.Prerequisites.Append(legacyPrerequisite).ToList() };
+        }
+
         // 4. 生成 Inno 脚本
         var outputDirectory = request.OutputDirectory
             ?? (request.Project is null
@@ -83,11 +106,22 @@ public sealed class BuildService
                 : Path.GetFullPath(request.Project.Output.Directory));
 
         var baseFilename = $"{model.Product.Name}_Setup_{model.Product.Version}";
+        var buildDirectory = Path.Combine(Path.GetTempPath(), "DotSetupForge", "build", $"iss-{Guid.NewGuid():N}");
+        var branding = new WizardBrandAssetGenerator().Resolve(model, buildDirectory);
+        foreach (var warning in branding.Warnings)
+        {
+            diagnostics.Add(DiagnosticMessage.Warning("DP3004", warning));
+        }
+        model = model with
+        {
+            WizardSmallImagePath = branding.SmallImagePath ?? string.Empty,
+            WizardImagePath = branding.WelcomeImagePath ?? string.Empty,
+        };
         progress?.Report("生成 installer.iss...");
         var scriptResult = _scriptGenerator.GenerateToFile(
             model,
             new InnoScriptOptions(baseFilename, outputDirectory),
-            Path.Combine(Path.GetTempPath(), "DotSetupForge", "build", $"iss-{Guid.NewGuid():N}"));
+            buildDirectory);
 
         // 4. 定位 ISCC
         var location = _locator.Locate();
@@ -201,4 +235,8 @@ public sealed class BuildService
         var mode = project?.Runtime.Mode ?? RuntimeDeploymentMode.SmartOffline;
         return mode is RuntimeDeploymentMode.SmartOffline or RuntimeDeploymentMode.Online;
     }
+
+    private static bool ShouldEmbedLegacyFramework(PackageProject? project, ApplicationAnalysisResult analysis) =>
+        analysis.DeploymentMode == DeploymentMode.LegacyFramework &&
+        (project?.Runtime.Mode ?? RuntimeDeploymentMode.SmartOffline) == RuntimeDeploymentMode.SmartOffline;
 }

@@ -5,11 +5,77 @@ AppName={{ appName }}
 AppVersion={{ appVersion }}
 AppPublisher={{ appPublisher }}
 DefaultDirName={{ installDirectory }}
+UsePreviousAppDir=yes
 DefaultGroupName={{ appName }}
 PrivilegesRequired={{ privilegesRequired }}
 OutputDir={{ outputDirectory }}
 OutputBaseFilename={{ outputBaseFilename }}
 UninstallDisplayName={{ appName }}
+{{ if hasSetupIcon }}
+UninstallDisplayIcon="{{ uninstallDisplayIcon }}"
+{{ end }}
+{{ if hasSetupIcon }}
+SetupIconFile="{{ setupIconFile }}"
+{{ end }}
+{{ if hasWizardSmallImage }}
+WizardSmallImageFile="{{ wizardSmallImageFile }}"
+{{ else }}
+WizardSmallImageFile=
+{{ end }}
+{{ if hasWizardImage }}
+DisableWelcomePage=no
+WizardImageFile="{{ wizardImageFile }}"
+WizardImageStretch=yes
+{{ end }}
 Compression=lzma2
 SolidCompression=yes
-WizardStyle=modern
+WizardStyle={{ wizardStyle }}
+
+[Languages]
+Name: "chinesesimp"; MessagesFile: "compiler:Default.isl"
+
+[Messages]
+chinesesimp.SetupAppTitle=安装
+chinesesimp.SetupWindowTitle=安装 - %1
+chinesesimp.UninstallAppTitle=卸载
+chinesesimp.UninstallAppFullTitle=%1 卸载
+chinesesimp.InformationTitle=信息
+chinesesimp.ConfirmTitle=确认
+chinesesimp.ErrorTitle=错误
+chinesesimp.ButtonBack=< 上一步(&B)
+chinesesimp.ButtonNext=下一步(&N) >
+chinesesimp.ButtonInstall=安装(&I)
+chinesesimp.ButtonOK=确定
+chinesesimp.ButtonCancel=取消
+chinesesimp.ButtonYes=是(&Y)
+chinesesimp.ButtonNo=否(&N)
+chinesesimp.ButtonFinish=完成(&F)
+chinesesimp.ButtonBrowse=浏览(&B)...
+chinesesimp.ButtonWizardBrowse=浏览(&R)...
+chinesesimp.ClickNext=点击“下一步”继续，或点击“取消”退出安装程序。
+chinesesimp.BrowseDialogTitle=浏览文件夹
+chinesesimp.BrowseDialogLabel=在下面的列表中选择一个文件夹，然后点击“确定”。
+chinesesimp.WelcomeLabel1=欢迎使用 [name] 安装向导
+chinesesimp.WelcomeLabel2=即将在您的计算机上安装 [name/ver]。%n%n建议您在继续安装前关闭所有其他应用程序。
+chinesesimp.WizardSelectDir=选择目标位置
+chinesesimp.SelectDirDesc=您想将 [name] 安装在哪里？
+chinesesimp.SelectDirLabel3=安装程序将安装 [name] 到下面的文件夹中。
+chinesesimp.SelectDirBrowseLabel=点击“下一步”继续。如果您想选择其他文件夹，点击“浏览”。
+chinesesimp.DiskSpaceGBLabel=至少需要有 [gb] GB 的可用磁盘空间。
+chinesesimp.DiskSpaceMBLabel=至少需要有 [mb] MB 的可用磁盘空间。
+chinesesimp.WizardSelectProgramGroup=选择开始菜单文件夹
+chinesesimp.SelectStartMenuFolderDesc=安装程序应该在哪里放置程序的快捷方式？
+chinesesimp.WizardReady=准备安装
+chinesesimp.ReadyLabel1=安装程序准备就绪，现在可以开始安装 [name] 到您的计算机。
+chinesesimp.ReadyLabel2a=点击“安装”继续。如果您想修改设置，点击“上一步”。
+chinesesimp.WizardInstalling=正在安装
+chinesesimp.InstallingLabel=安装程序正在安装 [name] 到您的计算机，请稍候。
+chinesesimp.FinishedHeadingLabel=完成 [name] 安装向导
+chinesesimp.FinishedLabel=安装程序已在您的计算机中安装了 [name]。您可以通过已安装的快捷方式运行此应用程序。
+chinesesimp.ClickFinish=点击“完成”退出安装程序。
+chinesesimp.RunEntryExec=运行 %1
+chinesesimp.StatusExtractFiles=正在提取文件...
+chinesesimp.StatusCreateIcons=正在创建快捷方式...
+chinesesimp.StatusSavingUninstall=正在保存卸载信息...
+chinesesimp.ConfirmUninstall=您确认要完全移除 %1 及其所有组件吗？
+chinesesimp.UninstallStatusLabel=正在从您的计算机中移除 %1，请稍候。

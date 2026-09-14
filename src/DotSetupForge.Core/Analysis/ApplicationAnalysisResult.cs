@@ -10,6 +10,9 @@ public sealed record ApplicationAnalysisResult
     /// <summary>主程序完整路径。</summary>
     public string? MainExecutable { get; init; }
 
+    /// <summary>未能自动确定主程序时可供用户选择的候选相对路径。</summary>
+    public IReadOnlyList<string> MainExecutableCandidates { get; init; } = [];
+
     public string ApplicationName { get; init; } = string.Empty;
 
     public ApplicationType ApplicationType { get; init; } = ApplicationType.Unknown;

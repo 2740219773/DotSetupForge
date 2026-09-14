@@ -93,6 +93,17 @@ public class RuntimeCacheTests : IDisposable
     }
 
     [Fact]
+    public void Find_Lower_Patch_Should_Miss()
+    {
+        SaveSample("10.0.9", TargetArchitecture.X64);
+
+        var hit = _cache.Find(new RuntimeRequirement(
+            RuntimeFamily.WindowsDesktop, "10.0.10", TargetArchitecture.X64));
+
+        Assert.Null(hit);
+    }
+
+    [Fact]
     public void Save_Moves_File_And_Writes_Metadata()
     {
         var installer = Path.Combine(_tempRoot, "seed-installer.exe");

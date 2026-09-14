@@ -30,16 +30,18 @@ public sealed class InstallerModelBuilder
         var installDirectory = project?.Installer.InstallDirectory;
         if (string.IsNullOrEmpty(installDirectory))
         {
-            installDirectory = string.IsNullOrEmpty(product.Publisher)
-                ? $"{{autopf}}\\{product.Name}"
-                : $"{{autopf}}\\{product.Publisher}\\{product.Name}";
+            installDirectory = BuildPreferredDataDriveDirectory(product);
         }
 
         return new InstallerModel
         {
             Product = product,
             Scope = project?.Installer.Scope ?? InstallScope.Machine,
+            WizardTheme = project?.Installer.WizardTheme ?? InstallerWizardTheme.Stellar,
             InstallDirectory = installDirectory,
+            SetupIconPath = project?.Installer.SetupIconPath ?? string.Empty,
+            WizardSmallImagePath = project?.Installer.WizardSmallImagePath ?? string.Empty,
+            WizardImagePath = project?.Installer.WizardImagePath ?? string.Empty,
             MainExecutable = mainExeName,
             Files = files,
             Shortcuts = shortcuts,
@@ -51,6 +53,12 @@ public sealed class InstallerModelBuilder
             Signing = project?.Signing ?? new SigningOptions(),
         };
     }
+
+    /// <summary>新项目默认放在数据盘，生成脚本时会在目标机没有 D 盘时自动回退到 Program Files。</summary>
+    private static string BuildPreferredDataDriveDirectory(ProductModel product) =>
+        string.IsNullOrEmpty(product.Publisher)
+            ? $@"D:\Apps\{product.Name}"
+            : $@"D:\Apps\{product.Publisher}\{product.Name}";
 
     private static ProductModel BuildProduct(ApplicationAnalysisResult analysis, PackageProject? project)
     {

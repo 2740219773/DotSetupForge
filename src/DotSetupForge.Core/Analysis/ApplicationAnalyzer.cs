@@ -8,6 +8,7 @@ public sealed class ApplicationAnalyzer
     private readonly DirectoryScanner _scanner = new();
     private readonly ExecutableResolver _resolver = new();
     private readonly RuntimeConfigParser _runtimeConfigParser = new();
+    private readonly LegacyFrameworkConfigParser _legacyFrameworkConfigParser = new();
     private readonly DepsJsonAnalyzer _depsJsonAnalyzer = new();
     private readonly PeArchitectureAnalyzer _peAnalyzer = new();
     private readonly AssemblyMetadataAnalyzer _assemblyAnalyzer = new();
@@ -38,7 +39,12 @@ public sealed class ApplicationAnalyzer
 
             diagnostics.Add(DiagnosticMessage.Warning("DP1005",
                 $"发现多个候选主程序，请指定 --main-exe：{string.Join(", ", resolution.Candidates)}"));
-            return ApplicationAnalysisResult.Failed(diagnostics);
+            return new ApplicationAnalysisResult
+            {
+                Success = false,
+                Diagnostics = diagnostics,
+                MainExecutableCandidates = resolution.Candidates,
+            };
         }
 
         var mainExe = Path.Combine(directory, resolution.Resolved);
@@ -47,7 +53,10 @@ public sealed class ApplicationAnalyzer
         // 2. runtimeconfig
         var runtimeConfigPath = Path.Combine(directory, $"{stem}.runtimeconfig.json");
         var runtimeConfig = _runtimeConfigParser.ParseFile(runtimeConfigPath);
-        if (runtimeConfig is null)
+        var legacyFrameworkVersion = runtimeConfig is null
+            ? _legacyFrameworkConfigParser.ParseFile(Path.Combine(directory, $"{stem}.exe.config"))
+            : null;
+        if (runtimeConfig is null && legacyFrameworkVersion is null)
         {
             diagnostics.Add(DiagnosticMessage.Error("DP1002", $"runtimeconfig.json 缺失：{runtimeConfigPath}"));
             return ApplicationAnalysisResult.Failed(diagnostics);
@@ -94,20 +103,27 @@ public sealed class ApplicationAnalyzer
         var metadata = _assemblyAnalyzer.Analyze(mainExe);
 
         // 6. Framework / Runtime 类型
-        var framework = SelectPrimaryFramework(runtimeConfig, diagnostics);
+        var framework = legacyFrameworkVersion is null
+            ? SelectPrimaryFramework(runtimeConfig!, diagnostics)
+            : new FrameworkReference("Microsoft.NETFramework", legacyFrameworkVersion);
         var runtimeName = framework.Name switch
         {
             "Microsoft.WindowsDesktop.App" => ".NET Desktop Runtime",
             "Microsoft.AspNetCore.App" => "ASP.NET Core Runtime",
             "Microsoft.NETCore.App" => ".NET Runtime",
+            "Microsoft.NETFramework" => $".NET Framework {framework.Version}",
             _ => string.Empty,
         };
 
         // 7. 程序类型
-        var appType = DetectApplicationType(runtimeConfig, deps);
+        var appType = legacyFrameworkVersion is null
+            ? DetectApplicationType(runtimeConfig!, deps)
+            : ApplicationType.WinForms;
 
         // 8. 部署模式
-        var deployment = DetectDeploymentMode(files, stem);
+        var deployment = legacyFrameworkVersion is null
+            ? DetectDeploymentMode(files, stem)
+            : DeploymentMode.LegacyFramework;
 
         var version = !string.IsNullOrEmpty(metadata.AssemblyVersion)
             ? metadata.AssemblyVersion
@@ -119,7 +135,9 @@ public sealed class ApplicationAnalyzer
             MainExecutable = mainExe,
             ApplicationName = stem, // 主程序文件名即产品名（apphost 命名约定）
             ApplicationType = appType,
-            TargetFramework = runtimeConfig.Tfm,
+            TargetFramework = legacyFrameworkVersion is null
+                ? runtimeConfig!.Tfm
+                : $"net{legacyFrameworkVersion.Replace(".", string.Empty, StringComparison.Ordinal)}",
             FrameworkName = framework.Name,
             FrameworkVersion = framework.Version,
             RuntimeName = runtimeName,

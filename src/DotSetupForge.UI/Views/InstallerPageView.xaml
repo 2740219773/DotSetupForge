@@ -22,7 +22,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="所有用户（需要管理员权限）" FontSize="13"
                                        Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Program Files" FontSize="11"
+                            <TextBlock Text="默认 D:\\Apps（可修改）" FontSize="11"
                                        Foreground="{StaticResource TextDisabledBrush}" Margin="10,2,0,0" />
                         </StackPanel>
                     </RadioButton>
@@ -46,11 +46,63 @@
             <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
                 <StackPanel>
                     <TextBlock Text="安装目录" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="使用 Inno Setup 常量模板，留空时自动生成（{autopf}\{Publisher}\{Name}）。"
+                    <TextBlock Text="默认优先 D:\\Apps；目标机没有 D 盘时自动回退到 Program Files。可改为任意盘符路径或 Inno Setup 常量模板。"
                                FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
                                Margin="0,0,0,8" />
                     <TextBox Text="{Binding Project.InstallDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="例如 {autopf}\{Publisher}\{ProductName}" />
+                             ToolTip="例如 D:\\Apps\\发布者\\产品名，或 {autopf}\\发布者\\产品名" />
+                </StackPanel>
+            </Border>
+
+            <!-- 安装向导外观 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="安装向导外观" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="安装包内置简体中文向导。未选择图片时不显示 Inno Setup 的默认纸箱图标。"
+                               FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,12" TextWrapping="Wrap" />
+
+                    <TextBlock Text="主题" Style="{StaticResource FormLabelStyle}" />
+                    <ComboBox SelectedValue="{Binding Project.WizardTheme, Mode=TwoWay}"
+                              SelectedValuePath="Tag" Margin="0,0,0,10">
+                        <ComboBoxItem Content="Stellar · 深蓝（推荐）" Tag="Stellar" />
+                        <ComboBoxItem Content="Slate · 石板灰" Tag="Slate" />
+                        <ComboBoxItem Content="Zircon · 锆石灰" Tag="Zircon" />
+                        <ComboBoxItem Content="Modern Light · 浅色兼容" Tag="ModernLight" />
+                    </ComboBox>
+                    <TextBlock Text="主题同时应用于安装器和卸载器；未选择自定义图片时，将自动根据 ICO 生成品牌图。"
+                               FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="0,0,0,12" TextWrapping="Wrap" />
+
+                    <TextBlock Text="右上角品牌图（可选）" Style="{StaticResource FormLabelStyle}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Text="{Binding Project.WizardSmallImagePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="True" ToolTip="PNG 或 BMP；建议提供 256×256 以上的透明 PNG" />
+                        <Button Grid.Column="1" Content="选择图片" Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0" Command="{Binding SelectWizardSmallImageCommand}" />
+                        <Button Grid.Column="2" Content="清除" Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0" Command="{Binding ClearWizardSmallImageCommand}" />
+                    </Grid>
+
+                    <TextBlock Text="欢迎页与完成页品牌图（可选）" Style="{StaticResource FormLabelStyle}" Margin="0,12,0,0" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Text="{Binding Project.WizardImagePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="True" ToolTip="PNG 或 BMP；建议竖版比例 164:314，至少 404×772" />
+                        <Button Grid.Column="1" Content="选择图片" Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0" Command="{Binding SelectWizardImageCommand}" />
+                        <Button Grid.Column="2" Content="清除" Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0" Command="{Binding ClearWizardImageCommand}" />
+                    </Grid>
                 </StackPanel>
             </Border>
 

@@ -41,7 +41,19 @@ public partial class FileNode : ObservableObject
 
     public string DisplaySize => Scanned is null ? string.Empty : FormatSize(Scanned.Size);
 
-    /// <summary>CheckBox 绑定（TwoWay）。</summary>
+    /// <summary>TreeList 状态列：目录只展示汇总，避免子项修改造成父级操作状态切换。</summary>
+    public string SelectionSummary => IsDirectory
+        ? $"{Children.Sum(child => child.IncludedFileCount)} / {EnumerateFiles().Count()} 包含"
+        : CheckedState == true ? "包含" : "排除";
+
+    /// <summary>文件行的单项操作文字。</summary>
+    public string FileActionText => CheckedState == true ? "排除" : "包含";
+
+    private int IncludedFileCount => IsDirectory
+        ? Children.Sum(child => child.IncludedFileCount)
+        : CheckedState == true ? 1 : 0;
+
+    /// <summary>CheckBox 的唯一状态入口。用户操作会向下覆盖，并向上聚合。</summary>
     public bool? CheckedState
     {
         get => _checkedState;
@@ -52,19 +64,11 @@ public partial class FileNode : ObservableObject
                 return;
             }
 
-            // 用户点击：向下级联，然后聚合父级
-            _checkedState = value;
-            OnPropertyChanged();
-
-            if (value is not null)
+            // null 仅用于目录的聚合显示，不是一个可持久化的用户选择。
+            if (value is bool included)
             {
-                foreach (var child in Children)
-                {
-                    child.SetState(value.Value, cascade: true);
-                }
+                ApplyUserState(included);
             }
-
-            Parent?.RefreshState();
         }
     }
 
@@ -73,7 +77,9 @@ public partial class FileNode : ObservableObject
     {
         _updating = true;
         _checkedState = value;
-        OnPropertyChanged();
+        OnPropertyChanged(nameof(CheckedState));
+        OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(FileActionText));
         _updating = false;
 
         if (cascade)
@@ -85,6 +91,18 @@ public partial class FileNode : ObservableObject
         }
     }
 
+    /// <summary>处理用户选择：目录递归覆盖子树，绝不改变父节点的操作状态。</summary>
+    public void ApplyUserState(bool value)
+    {
+        SetState(value, cascade: true);
+    }
+
+    /// <summary>把三态控件的用户点击归一为明确选择；部分选中状态点击时按“全部取消”处理。</summary>
+    public void ApplyUserState(bool? value) => ApplyUserState(value ?? false);
+
+    /// <summary>右键单节点操作：只更新当前节点，不级联子节点，也不影响父节点。</summary>
+    public void ApplyNodeOnlyState(bool value) => SetState(value, cascade: false);
+
     /// <summary>从子节点重新聚合自身状态，并向上传播。</summary>
     public void RefreshState()
     {
@@ -93,17 +111,17 @@ public partial class FileNode : ObservableObject
             return;
         }
 
-        var checkedCount = Children.Count(c => c.CheckedState == true);
-        bool? state = checkedCount switch
-        {
-            0 => false,
-            _ when checkedCount == Children.Count => true,
-            _ => null,
-        };
+        bool? state = Children.All(c => c.CheckedState == true)
+            ? true
+            : Children.All(c => c.CheckedState == false)
+                ? false
+                : null;
 
         _updating = true;
         _checkedState = state;
-        OnPropertyChanged();
+        OnPropertyChanged(nameof(CheckedState));
+        OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(FileActionText));
         _updating = false;
 
         Parent?.RefreshState();

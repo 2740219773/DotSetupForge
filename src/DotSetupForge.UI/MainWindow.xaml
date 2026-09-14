@@ -7,7 +7,7 @@
         xmlns:views="clr-namespace:DotSetupForge.UI.Views"
         xmlns:conv="clr-namespace:DotSetupForge.UI.Converters"
         mc:Ignorable="d"
-        Title="DotSetupForge — .NET Windows 应用打包工具"
+        Title="全能打包助手"
         Width="1180" Height="760"
         MinWidth="960" MinHeight="640"
         WindowStartupLocation="CenterScreen"
@@ -56,7 +56,7 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="DotSetupForge" Foreground="{StaticResource TextPrimaryBrush}"
+                            <TextBlock Text="全能打包助手" Foreground="{StaticResource TextPrimaryBrush}"
                                        FontWeight="SemiBold" FontSize="14" />
                             <TextBlock Text="打包工具" Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="11" />
@@ -80,7 +80,7 @@
                 </StackPanel>
 
                 <Border DockPanel.Dock="Bottom" Padding="18,12">
-                    <TextBlock Text="v0.4.0 · M3 GUI" FontSize="11"
+                    <TextBlock Text="v0.4.0 · M3 GUI · build 2026-08-10.1130" FontSize="11"
                                Foreground="{StaticResource TextDisabledBrush}" />
                 </Border>
 

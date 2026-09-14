@@ -15,6 +15,7 @@ namespace DotSetupForge.UI.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly RecentProjectsService _recentProjects;
+    private readonly ManagedProjectStore _managedProjects;
     private readonly PackageProjectService _projects = new();
     private readonly ApplicationAnalysisService _analysis = new();
 
@@ -60,6 +61,7 @@ public partial class MainViewModel : ObservableObject
     {
         Dialogs = dialogs;
         _recentProjects = new RecentProjectsService();
+        _managedProjects = new ManagedProjectStore();
 
         ApplicationPage = new ApplicationPageViewModel(dialogs, _analysis);
         FilesPage = new FilesPageViewModel(dialogs, _analysis);
@@ -95,6 +97,27 @@ public partial class MainViewModel : ObservableObject
         }
 
         var result = _analysis.Analyze(directory);
+        if (!result.Success && result.MainExecutableCandidates.Count > 0)
+        {
+            var selected = Dialogs.PickFile(
+                "选择要创建快捷方式并在安装后启动的主程序",
+                "可选主程序 (*.exe)|*.exe",
+                directory);
+            if (string.IsNullOrEmpty(selected))
+            {
+                return;
+            }
+
+            var selectedRelativePath = Path.GetRelativePath(directory, selected).Replace('\\', '/');
+            if (!result.MainExecutableCandidates.Contains(selectedRelativePath, StringComparer.OrdinalIgnoreCase))
+            {
+                Dialogs.Error("请选择当前发布目录中列出的候选主程序。", "主程序无效");
+                return;
+            }
+
+            result = _analysis.Analyze(directory, selectedRelativePath);
+        }
+
         if (!result.Success)
         {
             Dialogs.Error(
@@ -105,6 +128,8 @@ public partial class MainViewModel : ObservableObject
 
         var project = CreateProjectFromAnalysis(directory, result);
         OpenProject(project, null);
+        SaveManagedProject();
+
         Dialogs.Info(
             $"已自动识别：\n" +
             $"  主程序：{Path.GetFileName(result.MainExecutable)}\n" +
@@ -126,7 +151,21 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenProjectFile()
     {
-        var path = Dialogs.PickFile("打开打包项目", "打包项目 (*.pack.json)|*.pack.json|所有文件 (*.*)|*.*");
+        string initialDirectory;
+        try
+        {
+            initialDirectory = _managedProjects.GetProjectDirectory();
+        }
+        catch (IOException ex)
+        {
+            Dialogs.Error($"无法打开项目配置目录：{ex.Message}", "打开失败");
+            return;
+        }
+
+        var path = Dialogs.PickFile(
+            "打开打包项目",
+            "打包项目 (*.pack.json)|*.pack.json|所有文件 (*.*)|*.*",
+            initialDirectory);
         if (string.IsNullOrEmpty(path))
         {
             return;
@@ -178,15 +217,19 @@ public partial class MainViewModel : ObservableObject
             AutoDetect = true,
             RuntimeFamily = result.FrameworkName switch
             {
+                "Microsoft.NETFramework" => nameof(RuntimeFamily.NetFramework),
                 "Microsoft.WindowsDesktop.App" => nameof(RuntimeFamily.WindowsDesktop),
                 "Microsoft.AspNetCore.App" => nameof(RuntimeFamily.AspNetCore),
                 _ => nameof(RuntimeFamily.DotNet),
             },
             RuntimeVersion = NormalizeRuntimeVersion(result.FrameworkVersion),
             RuntimeArchitecture = result.Architecture.ToString(),
-            RuntimeMode = result.DeploymentMode == DeploymentMode.SelfContained
-                ? nameof(RuntimeDeploymentMode.SelfContained)
-                : nameof(RuntimeDeploymentMode.SmartOffline),
+            RuntimeMode = result.DeploymentMode switch
+            {
+                DeploymentMode.LegacyFramework => nameof(RuntimeDeploymentMode.SmartOffline),
+                DeploymentMode.SelfContained => nameof(RuntimeDeploymentMode.SelfContained),
+                _ => nameof(RuntimeDeploymentMode.SmartOffline),
+            },
         };
         return project;
     }
@@ -261,13 +304,8 @@ public partial class MainViewModel : ObservableObject
 
         if (string.IsNullOrEmpty(ProjectPath))
         {
-            var path = SavePackDialog();
-            if (path is null)
-            {
-                return;
-            }
-
-            ProjectPath = path;
+            SaveManagedProject();
+            return;
         }
 
         try
@@ -299,6 +337,27 @@ public partial class MainViewModel : ObservableObject
 
         ProjectPath = path;
         SaveProject();
+    }
+
+    /// <summary>不询问用户，将新建项目保存到打包工具管理的配置目录。</summary>
+    private void SaveManagedProject()
+    {
+        if (Project is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var json = _projects.Serialize(Project.ToProject());
+            ProjectPath = _managedProjects.Save(ProjectDisplayName, Project.SourcePath, json);
+            _recentProjects.Add(ProjectPath, ProjectDisplayName);
+            RefreshRecentProjects();
+        }
+        catch (IOException ex)
+        {
+            Dialogs.Error($"无法自动保存打包项目配置：{ex.Message}", "保存失败");
+        }
     }
 
     private string? SavePackDialog()

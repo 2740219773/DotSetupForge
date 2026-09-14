@@ -28,6 +28,23 @@ public class ReleaseMetadataParserTests
     }
 
     [Fact]
+    public void FindBestMatch_WindowsDesktop_With_Current_RidOnly_InstallerName_Should_Return_Latest_Patch()
+    {
+        var releasesJson = ReleasesJson()
+            .Replace("\"version\": \"10.0.1\"", "\"release-version\": \"10.0.1\"", StringComparison.Ordinal)
+            .Replace("windowsdesktop-runtime-10.0.1-win-x64.exe", "windowsdesktop-runtime-win-x64.exe", StringComparison.Ordinal);
+        var requirement = new RuntimeRequirement(
+            RuntimeFamily.WindowsDesktop, "10.0", TargetArchitecture.X64);
+
+        var definition = _parser.FindBestMatch(releasesJson, requirement);
+
+        Assert.NotNull(definition);
+        Assert.Equal("10.0.1", definition!.Version);
+        Assert.Equal("windowsdesktop-runtime-win-x64.exe", definition.FileName);
+        Assert.Equal("DDD", definition.Sha256);
+    }
+
+    [Fact]
     public void FindBestMatch_WindowsDesktop_X86_Should_Fallback_To_Older_Patch()
     {
         var requirement = new RuntimeRequirement(

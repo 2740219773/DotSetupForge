@@ -1,6 +1,229 @@
-{{ if hasPrerequisites }}
+{{ if hasPrerequisites || hasPreferredDataDrive || hasUpgradeHandling }}
 [Code]
 
+{{ if hasPreferredDataDrive }}
+{ 优先将默认应用安装到 D 盘；没有 D 盘的机器回退到 Program Files。 }
+function GetPreferredDataDriveInstallDir(Param: String): String;
+begin
+  if DirExists('D:\') then
+    Result := 'D:\Apps\' + Param
+  else
+    Result := ExpandConstant('{autopf}\') + Param;
+end;
+{{ end }}
+
+{{ if hasUpgradeHandling }}
+var
+  PreviousUninstallString: String;
+  PreviousVersion: String;
+  HasPreviousInstallation: Boolean;
+  UpgradeChoicePage: TInputOptionWizardPage;
+
+function TryReadPreviousInstallation(RootKey: Integer; SubKey: String): Boolean; forward;
+function FindPreviousInstallationByDisplayName(RootKey: Integer): Boolean; forward;
+
+function GetPreviousInstallation: Boolean;
+begin
+  PreviousUninstallString := '';
+  PreviousVersion := '';
+  Result := TryReadPreviousInstallation(HKCU, '{{ uninstallKey }}');
+  if not Result then
+    Result := TryReadPreviousInstallation(HKLM32, '{{ uninstallKey }}');
+  if not Result and IsWin64 then
+    Result := TryReadPreviousInstallation(HKLM64, '{{ uninstallKey }}');
+  if not Result then
+    Result := FindPreviousInstallationByDisplayName(HKCU);
+  if not Result then
+    Result := FindPreviousInstallationByDisplayName(HKLM32);
+  if not Result and IsWin64 then
+    Result := FindPreviousInstallationByDisplayName(HKLM64);
+end;
+
+function TryReadPreviousInstallation(RootKey: Integer; SubKey: String): Boolean;
+begin
+  Result := RegQueryStringValue(RootKey, SubKey, 'UninstallString', PreviousUninstallString);
+  if Result then
+    RegQueryStringValue(RootKey, SubKey, 'DisplayVersion', PreviousVersion);
+end;
+
+function FindPreviousInstallationByDisplayName(RootKey: Integer): Boolean;
+var
+  Keys: TArrayOfString;
+  Index: Integer;
+  Candidate: String;
+  DisplayName: String;
+  Publisher: String;
+begin
+  Result := False;
+  if not RegGetSubkeyNames(RootKey, 'Software\Microsoft\Windows\CurrentVersion\Uninstall', Keys) then
+    exit;
+
+  for Index := 0 to GetArrayLength(Keys) - 1 do
+  begin
+    Candidate := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + Keys[Index];
+    if RegQueryStringValue(RootKey, Candidate, 'DisplayName', DisplayName) and
+       (CompareText(DisplayName, '{{ appName }}') = 0) then
+    begin
+      if '{{ appPublisher }}' <> '' then
+      begin
+        if not RegQueryStringValue(RootKey, Candidate, 'Publisher', Publisher) or
+           (CompareText(Publisher, '{{ appPublisher }}') <> 0) then
+          continue;
+      end;
+      Result := TryReadPreviousInstallation(RootKey, Candidate);
+      if Result then
+        exit;
+    end;
+  end;
+end;
+
+function GetPreviousInstallationSummary: String;
+begin
+  if PreviousVersion <> '' then
+    Result := '{{ appName }} ' + PreviousVersion
+  else
+    Result := '{{ appName }}（版本未知）';
+end;
+
+function GetUninstallerExecutable(UninstallString: String): String;
+var
+  ClosingQuote: Integer;
+  FirstSpace: Integer;
+begin
+  UninstallString := Trim(UninstallString);
+  if (Length(UninstallString) > 0) and (UninstallString[1] = '"') then
+  begin
+    ClosingQuote := Pos('"', Copy(UninstallString, 2, Length(UninstallString)));
+    if ClosingQuote > 0 then
+      Result := Copy(UninstallString, 2, ClosingQuote - 1)
+    else
+      Result := '';
+  end
+  else
+  begin
+    FirstSpace := Pos(' ', UninstallString);
+    if FirstSpace > 0 then
+      Result := Copy(UninstallString, 1, FirstSpace - 1)
+    else
+      Result := UninstallString;
+  end;
+end;
+
+function GetUninstallerParameters(UninstallString: String): String;
+var
+  ClosingQuote: Integer;
+begin
+  UninstallString := Trim(UninstallString);
+  if (Length(UninstallString) > 0) and (UninstallString[1] = '"') then
+  begin
+    ClosingQuote := Pos('"', Copy(UninstallString, 2, Length(UninstallString)));
+    if ClosingQuote > 0 then
+      Result := Trim(Copy(UninstallString, ClosingQuote + 2, Length(UninstallString)))
+    else
+      Result := '';
+  end
+  else
+  begin
+    ClosingQuote := Pos(' ', UninstallString);
+    if ClosingQuote > 0 then
+      Result := Trim(Copy(UninstallString, ClosingQuote + 1, Length(UninstallString)))
+    else
+      Result := '';
+  end;
+end;
+
+function RunPreviousUninstaller: Boolean;
+var
+  UninstallerPath: String;
+  UninstallerParameters: String;
+  ResultCode: Integer;
+begin
+  Result := False;
+  UninstallerPath := GetUninstallerExecutable(PreviousUninstallString);
+  if not FileExists(UninstallerPath) then
+  begin
+    MsgBox('未找到已安装版本的卸载程序，无法继续。请先在 Windows“已安装的应用”中卸载该版本。', mbError, MB_OK);
+    exit;
+  end;
+
+  UninstallerParameters := GetUninstallerParameters(PreviousUninstallString);
+  if not Exec(UninstallerPath, UninstallerParameters, '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+  begin
+    MsgBox('无法启动旧版本卸载程序。', mbError, MB_OK);
+    exit;
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    MsgBox('旧版本卸载未成功完成（退出码 ' + IntToStr(ResultCode) + '）。', mbError, MB_OK);
+    exit;
+  end;
+
+  if GetPreviousInstallation then
+  begin
+    MsgBox('旧版本仍被系统识别为已安装，安装已停止。', mbError, MB_OK);
+    exit;
+  end;
+
+  Result := True;
+end;
+
+procedure InitializeWizard;
+var
+  InstalledVersionText: String;
+begin
+  HasPreviousInstallation := GetPreviousInstallation;
+  if not HasPreviousInstallation then
+    exit;
+
+  InstalledVersionText := PreviousVersion;
+  if InstalledVersionText = '' then
+    InstalledVersionText := '未知版本';
+
+  UpgradeChoicePage := CreateInputOptionPage(
+    wpSelectDir,
+    '检测到已安装版本',
+    '已安装 ' + '{{ appName }}' + ' ' + InstalledVersionText,
+    '当前安装包版本为 {{ productVersion }}。请选择接下来的操作：',
+    True,
+    True);
+  UpgradeChoicePage.Add('直接升级（保留用户配置和数据，推荐）');
+  UpgradeChoicePage.Add('卸载后重新安装');
+  UpgradeChoicePage.Add('仅卸载当前版本，不继续安装');
+  UpgradeChoicePage.Add('取消安装');
+  UpgradeChoicePage.SelectedValueIndex := 0;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if not HasPreviousInstallation then
+    exit;
+  if CurPageID <> UpgradeChoicePage.ID then
+    exit;
+
+  case UpgradeChoicePage.SelectedValueIndex of
+    0: begin
+         { Inno Setup 会沿用同 AppId 的既有安装目录，直接覆盖可更新的文件。 }
+       end;
+    1: begin
+         if not RunPreviousUninstaller then
+           Result := False;
+       end;
+    2: begin
+         if RunPreviousUninstaller then
+           WizardForm.Close;
+         Result := False;
+       end;
+    3: begin
+         WizardForm.Close;
+         Result := False;
+       end;
+  end;
+end;
+{{ end }}
+
+{{ if hasPrerequisites }}
 const
   DotNetSuccessCode = {{ successCode }};
   DotNetRebootCode = {{ rebootCode }};
@@ -8,33 +231,50 @@ const
 var
   DotNetRebootRequired: Boolean;
 
-{--- 版本比较：解析 "major.minor[.patch]" ---}
-function ParseMajorMinor(S: String; var Major: Integer; var Minor: Integer): Boolean;
+{--- 版本比较：解析 "major.minor[.patch]"，缺失 Patch 时按 0 处理 ---}
+function ParseVersion(S: String; var Major: Integer; var Minor: Integer; var Patch: Integer): Boolean;
 var
-  DotPos: Integer;
+  FirstDot: Integer;
+  SecondDot: Integer;
 begin
-  DotPos := Pos('.', S);
-  if DotPos = 0 then
+  FirstDot := Pos('.', S);
+  if FirstDot = 0 then
   begin
     Result := False;
     exit;
   end;
-  Major := StrToIntDef(Copy(S, 1, DotPos - 1), -1);
-  Minor := StrToIntDef(Copy(S, DotPos + 1, Length(S)), -1);
-  Result := (Major >= 0) and (Minor >= 0);
+
+  SecondDot := Pos('.', Copy(S, FirstDot + 1, Length(S)));
+  if SecondDot = 0 then
+  begin
+    Major := StrToIntDef(Copy(S, 1, FirstDot - 1), -1);
+    Minor := StrToIntDef(Copy(S, FirstDot + 1, Length(S)), -1);
+    Patch := 0;
+  end
+  else
+  begin
+    SecondDot := FirstDot + SecondDot;
+    Major := StrToIntDef(Copy(S, 1, FirstDot - 1), -1);
+    Minor := StrToIntDef(Copy(S, FirstDot + 1, SecondDot - FirstDot - 1), -1);
+    Patch := StrToIntDef(Copy(S, SecondDot + 1, Length(S)), -1);
+  end;
+
+  Result := (Major >= 0) and (Minor >= 0) and (Patch >= 0);
 end;
 
-{--- 目录下是否存在版本 >= 需求的共享框架（同 Major.Minor，Patch 向上兼容） ---}
+{--- 目录下是否存在满足版本的共享框架：仅同 Major.Minor，Patch 向上兼容 ---}
 function DirHasVersionAtLeast(Dir: String; RequiredVersion: String): Boolean;
 var
   FindRec: TFindRec;
   Major: Integer;
   Minor: Integer;
+  Patch: Integer;
   ReqMajor: Integer;
   ReqMinor: Integer;
+  ReqPatch: Integer;
 begin
   Result := False;
-  if not ParseMajorMinor(RequiredVersion, ReqMajor, ReqMinor) then
+  if not ParseVersion(RequiredVersion, ReqMajor, ReqMinor, ReqPatch) then
     exit;
   if FindFirst(Dir + '\*', FindRec) then
   begin
@@ -43,9 +283,9 @@ begin
         { FILE_ATTRIBUTE_DIRECTORY = 16 }
         if (FindRec.Attributes and 16) <> 0 then
         begin
-          if ParseMajorMinor(FindRec.Name, Major, Minor) then
+          if ParseVersion(FindRec.Name, Major, Minor, Patch) then
           begin
-            if (Major > ReqMajor) or ((Major = ReqMajor) and (Minor >= ReqMinor)) then
+            if (Major = ReqMajor) and (Minor = ReqMinor) and (Patch >= ReqPatch) then
             begin
               Result := True;
               exit;
@@ -61,12 +301,30 @@ end;
 {{ for p in prerequisites }}
 
 {--- {{ p.name }} ---}
+{{ if p.detection == "FrameworkDirectory" }}
+function Get{{ p.id }}DotNetRoot(var DotNetRoot: String): Boolean;
+begin
+  { .NET InstallLocation 通常注册在 32 位视图；不同安装器版本也可能写入 64 位视图或 sharedhost Path。 }
+  Result := RegQueryStringValue(HKLM32, 'SOFTWARE\dotnet\Setup\InstalledVersions\{{ p.registryArchitecture }}', 'InstallLocation', DotNetRoot);
+  if not Result and IsWin64 then
+  begin
+    Result := RegQueryStringValue(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\{{ p.registryArchitecture }}', 'InstallLocation', DotNetRoot);
+    if not Result then
+      Result := RegQueryStringValue(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\{{ p.registryArchitecture }}\sharedhost', 'Path', DotNetRoot);
+  end;
+end;
+
 function Is{{ p.id }}Installed: Boolean;
 var
+  DotNetRoot: String;
   SharedDir: String;
 begin
-  SharedDir := ExpandConstant('{win}\dotnet\shared\{{ p.frameworkDir }}');
-  Result := DirectoryExists(SharedDir) and DirHasVersionAtLeast(SharedDir, '{{ p.version }}');
+  Result := Get{{ p.id }}DotNetRoot(DotNetRoot);
+  if Result then
+  begin
+    SharedDir := AddBackslash(DotNetRoot) + 'shared\{{ p.frameworkDir }}';
+    Result := DirExists(SharedDir) and DirHasVersionAtLeast(SharedDir, '{{ p.version }}');
+  end;
 end;
 
 procedure Install{{ p.id }};
@@ -74,6 +332,7 @@ var
   ResultCode: Integer;
   InstallerPath: String;
 begin
+  ExtractTemporaryFile('{{ p.installerFileName }}');
   InstallerPath := ExpandConstant('{tmp}\{{ p.installerFileName }}');
   if not FileExists(InstallerPath) then
   begin
@@ -101,6 +360,47 @@ begin
       RaiseException('{{ p.name }} 安装后检测仍未通过');
   end;
 end;
+{{ else if p.detection == "NetFrameworkRelease" }}
+function Is{{ p.id }}Installed: Boolean;
+var
+  Release: Cardinal;
+begin
+  Result := RegQueryDWordValue(HKLM32, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full', 'Release', Release);
+  if not Result and IsWin64 then
+    Result := RegQueryDWordValue(HKLM64, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full', 'Release', Release);
+  Result := Result and (Release >= {{ p.releaseValue }});
+end;
+
+procedure Install{{ p.id }};
+var
+  ResultCode: Integer;
+  InstallerPath: String;
+begin
+  ExtractTemporaryFile('{{ p.installerFileName }}');
+  InstallerPath := ExpandConstant('{tmp}\{{ p.installerFileName }}');
+  if not FileExists(InstallerPath) then
+    RaiseException('{{ p.name }} 安装文件缺失：' + InstallerPath)
+  else if Exec(InstallerPath, '{{ p.installArguments }}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if ResultCode = DotNetRebootCode then
+      DotNetRebootRequired := True
+    else if ResultCode <> DotNetSuccessCode then
+      RaiseException('安装 {{ p.name }} 失败（退出码 ' + IntToStr(ResultCode) + '）');
+  end
+  else
+    RaiseException('无法启动 {{ p.name }} 安装程序');
+end;
+
+procedure InstallPrerequisite{{ p.id }};
+begin
+  if not Is{{ p.id }}Installed then
+  begin
+    Install{{ p.id }};
+    if not Is{{ p.id }}Installed then
+      RaiseException('{{ p.name }} 安装后检测仍未通过');
+  end;
+end;
+{{ end }}
 {{ end }}
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -117,4 +417,5 @@ function NeedRestart: Boolean;
 begin
   Result := DotNetRebootRequired;
 end;
+{{ end }}
 {{ end }}

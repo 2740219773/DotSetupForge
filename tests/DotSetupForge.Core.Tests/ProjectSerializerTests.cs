@@ -16,6 +16,13 @@ public class ProjectSerializerTests
             Publisher = "Test Publisher",
             MainExecutable = "TestApp.exe",
         },
+        Installer = new InstallerOptions
+        {
+            WizardTheme = InstallerWizardTheme.Zircon,
+            SetupIconPath = @"D:\assets\TestApp.ico",
+            WizardSmallImagePath = @"D:\assets\TestApp-small.png",
+            WizardImagePath = @"D:\assets\TestApp-welcome.png",
+        },
     };
 
     [Fact]
@@ -47,6 +54,10 @@ public class ProjectSerializerTests
         Assert.Equal(project.Product.AppId, result.Project!.Product.AppId);
         Assert.Equal(project.Product.Name, result.Project.Product.Name);
         Assert.Equal(project.Product.Version, result.Project.Product.Version);
+        Assert.Equal(project.Installer.SetupIconPath, result.Project.Installer.SetupIconPath);
+        Assert.Equal(project.Installer.WizardSmallImagePath, result.Project.Installer.WizardSmallImagePath);
+        Assert.Equal(project.Installer.WizardImagePath, result.Project.Installer.WizardImagePath);
+        Assert.Equal(InstallerWizardTheme.Zircon, result.Project.Installer.WizardTheme);
     }
 
     [Fact]

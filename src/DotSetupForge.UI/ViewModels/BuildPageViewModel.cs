@@ -126,6 +126,20 @@ public partial class BuildPageViewModel : ObservableObject, IProjectPageViewMode
         });
     }
 
+    /// <summary>完成指定步骤，不改变其他步骤的状态或顺序。</summary>
+    private void CompleteStep(string title, string detail)
+    {
+        _dispatcher.Invoke(() =>
+        {
+            var step = Steps.FirstOrDefault(s => s.Title == title);
+            if (step is not null)
+            {
+                step.Status = BuildStepStatus.Completed;
+                step.Detail = detail;
+            }
+        });
+    }
+
     private void FailStep(string title, string detail)
     {
         _dispatcher.Invoke(() =>
@@ -263,14 +277,20 @@ public partial class BuildPageViewModel : ObservableObject, IProjectPageViewMode
         {
             AdvanceTo("应用分析", "识别主程序与框架");
         }
-        else if (message.Contains("构建安装模型", StringComparison.Ordinal))
-        {
-            AdvanceTo("文件收集", "按规则筛选文件");
-        }
-        else if (message.Contains("准备 .NET Runtime", StringComparison.Ordinal)
-                 || message.Contains("Runtime", StringComparison.Ordinal))
+        else if (message.Contains("准备 .NET Runtime", StringComparison.Ordinal))
         {
             AdvanceTo("Runtime 准备", message);
+        }
+        else if (message.StartsWith("Runtime 命中缓存", StringComparison.Ordinal)
+                 || message.StartsWith("Runtime 已下载", StringComparison.Ordinal))
+        {
+            CompleteStep("Runtime 准备", message);
+        }
+        else if (message.Contains("构建安装模型", StringComparison.Ordinal))
+        {
+            // BuildService 在 Runtime 准备后才构建安装模型。这里不能 AdvanceTo 更靠前的
+            // “文件收集”步骤，否则会把已完成的 Runtime 重置为等待状态。
+            CompleteStep("文件收集", "按规则筛选文件");
         }
         else if (message.Contains("installer.iss", StringComparison.Ordinal))
         {

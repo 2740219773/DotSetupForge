@@ -59,6 +59,26 @@
                             <TextBox Text="{Binding Project.Publisher, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      ToolTip="用于安装目录与卸载信息，例如 XXX科技有限公司" />
                         </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,12,0,0">
+                            <TextBlock Text="安装程序与快捷方式 ICO 图标（可选）" Style="{StaticResource FormLabelStyle}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding Project.SetupIconPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsReadOnly="True" ToolTip="为空时使用默认图标；已选 ICO 同时用于桌面和开始菜单快捷方式" />
+                                <Button Grid.Column="1" Content="选择 ICO" Style="{StaticResource SecondaryButtonStyle}"
+                                        Margin="8,0,0,0" Command="{Binding SelectSetupIconCommand}" />
+                                <Button Grid.Column="2" Content="清除" Style="{StaticResource SecondaryButtonStyle}"
+                                        Margin="8,0,0,0" Command="{Binding ClearSetupIconCommand}" />
+                            </Grid>
+                            <TextBlock Text="{Binding SetupIconStatus}" FontSize="11"
+                                       Foreground="{StaticResource TextDisabledBrush}" Margin="0,4,0,0"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
                     </Grid>
                 </StackPanel>
             </Border>

@@ -1,4 +1,4 @@
 [Icons]
 {{ for s in shortcuts }}
-Name: "{{ s.fullName }}"; Filename: "{app}\{{ s.target }}"; WorkingDir: "{app}"
+Name: "{{ s.fullName }}"; Filename: "{app}\{{ s.target }}"; WorkingDir: "{app}"{{ if s.hasIcon }}; IconFilename: "{app}\{{ s.iconPath }}"{{ end }}
 {{ end }}

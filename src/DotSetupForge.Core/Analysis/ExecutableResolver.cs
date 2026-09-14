@@ -17,6 +17,13 @@ public sealed class ExecutableResolver
             return new ExecutableResolutionResult(null, []);
         }
 
+        // 传统 .NET Framework/WinForms 程序通常只有单个 EXE，没有同名 DLL 或
+        // runtimeconfig.json；此时可安全直接选中。
+        if (exes.Count == 1)
+        {
+            return new ExecutableResolutionResult(exes[0], []);
+        }
+
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in files)
         {

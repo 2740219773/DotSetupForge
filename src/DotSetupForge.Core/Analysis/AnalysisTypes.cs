@@ -39,6 +39,8 @@ public enum DeploymentMode
     FrameworkDependent,
     SelfContained,
     SingleFile,
+    /// <summary>旧式 .NET Framework 应用；不使用 .NET (Core/5+) Runtime。</summary>
+    LegacyFramework,
     Unknown,
 }
 

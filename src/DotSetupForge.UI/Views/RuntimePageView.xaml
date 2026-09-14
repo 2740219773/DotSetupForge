@@ -24,7 +24,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Runtime 家族" Style="{StaticResource FormLabelStyle}" />
-                            <TextBlock Text="{Binding Project.RuntimeFamily}" Style="{StaticResource ValueTextStyle}" />
+                            <TextBlock Text="{Binding RuntimeFamilyDisplay}" Style="{StaticResource ValueTextStyle}" />
                         </StackPanel>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="版本" Style="{StaticResource FormLabelStyle}" />
@@ -32,7 +32,7 @@
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="架构" Style="{StaticResource FormLabelStyle}" />
-                            <TextBlock Text="{Binding Project.RuntimeArchitecture}" Style="{StaticResource ValueTextStyle}" />
+                            <TextBlock Text="{Binding RuntimeArchitectureDisplay}" Style="{StaticResource ValueTextStyle}" />
                         </StackPanel>
                     </Grid>
                     <TextBlock Margin="0,12,0,0" FontSize="11.5"
@@ -46,8 +46,23 @@
                 <StackPanel>
                     <TextBlock Text="部署方式" Style="{StaticResource SectionTitleStyle}" />
 
+                    <TextBlock Text="{Binding LegacyRequirementText}"
+                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding IsLegacyFramework, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text=".NET Framework 4.x 是机器级就地升级，应用的 x86/x64 不影响前置包选择。可将 ClickOnce Bootstrapper 定义对应的离线 EXE 导入缓存并随安装包发布；3.5 SP1 需完整多文件载荷，当前不支持单 EXE 离线嵌入。"
+                               FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                               Margin="0,6,0,0" Visibility="{Binding IsLegacyFramework, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- 旧 .NET Framework：仅离线/不处理 -->
+                    <StackPanel Visibility="{Binding IsLegacyFramework, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="智能离线部署（必选）" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="进入本页时会先扫描 Bootstrapper 定义、SDK 包目录内的安装器以及本地缓存；只生成离线安装包。"
+                                   FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" />
+                    </StackPanel>
+
                     <!-- 智能离线 -->
-                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=SmartOffline}">
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=SmartOffline}"
+                                 Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}">
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,10">
                             <TextBlock Text="智能离线部署" FontSize="13" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimaryBrush}" />
@@ -58,36 +73,40 @@
                     </RadioButton>
                     <TextBlock Text="Runtime 随安装包一起发布；目标机已有满足版本的 Runtime 时自动跳过安装。"
                                FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
-                               Margin="24,-6,0,14" />
+                               Margin="24,-6,0,14" Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}" />
 
                     <!-- 在线 -->
-                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=Online}">
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=Online}"
+                                 Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}">
                         <TextBlock Text="在线部署" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
                     </RadioButton>
                     <TextBlock Text="安装包不包含 Runtime，安装时从 Microsoft 下载（依赖网络，工业现场不建议默认）。"
                                FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
-                               Margin="24,-6,0,14" />
+                               Margin="24,-6,0,14" Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}" />
 
                     <!-- Self-contained -->
-                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=SelfContained}">
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=SelfContained}"
+                                 Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}">
                         <TextBlock Text="Self-contained" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
                     </RadioButton>
                     <TextBlock Text="程序自包含运行时，不安装系统 Runtime（需在构建程序时启用自包含发布）。"
                                FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
-                               Margin="24,-6,0,14" />
+                               Margin="24,-6,0,14" Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}" />
 
                     <!-- 不处理 -->
-                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=None}">
+                    <RadioButton IsChecked="{Binding Project.RuntimeMode, Converter={StaticResource StringEquals}, ConverterParameter=None}"
+                                 Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}">
                         <TextBlock Text="不处理 Runtime" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" />
                     </RadioButton>
                     <TextBlock Text="目标机已统一部署环境，安装包不包含任何 Runtime。"
                                FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
-                               Margin="24,-6,0,0" />
+                               Margin="24,-6,0,0" Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}" />
                 </StackPanel>
             </Border>
 
-            <!-- Runtime 缓存 -->
-            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+            <!-- 现代 .NET Runtime 缓存 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0"
+                    Visibility="{Binding IsLegacyFramework, Converter={StaticResource InvertedBoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="Runtime 缓存" Style="{StaticResource SectionTitleStyle}" />
                     <TextBlock Text="{Binding CacheStatus}" FontSize="12.5"
@@ -110,20 +129,42 @@
                                     </Style>
                                 </ProgressBar.Style>
                             </ProgressBar>
+                            <TextBlock Text="{Binding DownloadProgressText}" FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding CachedFileName}" FontSize="11"
                                        Foreground="{StaticResource TextDisabledBrush}"
                                        Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="导入本地 EXE" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding ImportLocalCommand}" Margin="0,0,8,0"
+                                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
                             <Button Content="检查缓存" Style="{StaticResource SecondaryButtonStyle}"
                                     Command="{Binding CheckCacheCommand}" Margin="0,0,8,0"
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
-                            <Button Content="下载 Runtime" Style="{StaticResource PrimaryButtonStyle}"
+                            <Button Content="{Binding DownloadButtonText}" Style="{StaticResource PrimaryButtonStyle}"
                                     Command="{Binding DownloadCommand}"
                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
                         </StackPanel>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0"
+                    Visibility="{Binding IsLegacyFramework, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text=".NET Framework 离线缓存" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Text="{Binding CacheStatus}" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding CachedFileName}" FontSize="11" Foreground="{StaticResource TextDisabledBrush}" Margin="0,6,0,12" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="选择离线 EXE" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding ImportLocalCommand}"
+                                Visibility="{Binding NeedsLegacyInstallerSelection, Converter={StaticResource BoolToVisibility}}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
+                        <Button Content="检查缓存" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CheckCacheCommand}" Margin="8,0,0,0"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBool}}" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

@@ -10,6 +10,7 @@ public static class RuntimeRequirementFactory
     {
         var family = analysis.FrameworkName switch
         {
+            "Microsoft.NETFramework" => RuntimeFamily.NetFramework,
             "Microsoft.WindowsDesktop.App" => RuntimeFamily.WindowsDesktop,
             "Microsoft.AspNetCore.App" => RuntimeFamily.AspNetCore,
             _ => RuntimeFamily.DotNet,

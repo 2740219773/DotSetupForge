@@ -61,6 +61,9 @@ public class RuntimeDownloadManagerTests : IDisposable
     private static string Sha256Hex(byte[] content) =>
         Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
+    private static string Sha512Hex(byte[] content) =>
+        Convert.ToHexString(SHA512.HashData(content)).ToLowerInvariant();
+
     private static RuntimeDefinition Definition(string sha256) => new(
         RuntimeFamily.WindowsDesktop,
         "10.0.1",
@@ -118,6 +121,20 @@ public class RuntimeDownloadManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task Ensure_Download_With_Sha512_MetadataHash_Should_Save_To_Cache()
+    {
+        var content = Encoding.UTF8.GetBytes("runtime-installer-bytes");
+        var manager = new RuntimeDownloadManager(
+            _cache, new FakeCatalog(Definition(Sha512Hex(content))), Client(new StubHttpMessageHandler(content)));
+
+        var result = await manager.EnsureAsync(Requirement());
+
+        Assert.True(result.Success);
+        Assert.False(result.FromCache);
+        Assert.True(File.Exists(result.InstallerPath));
+    }
+
+    [Fact]
     public async Task Ensure_HashMismatch_Should_Fail_With_DP2002()
     {
         var content = Encoding.UTF8.GetBytes("runtime-installer-bytes");
@@ -140,5 +157,37 @@ public class RuntimeDownloadManagerTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, e => e.Code == "DP2003");
+    }
+
+    [Fact]
+    public async Task Import_Valid_Local_Installer_Should_Verify_Copy_And_Save_To_Cache()
+    {
+        var content = Encoding.UTF8.GetBytes("runtime-installer-bytes");
+        var source = Path.Combine(_tempRoot, "manual-runtime.exe");
+        File.WriteAllBytes(source, content);
+        var manager = new RuntimeDownloadManager(
+            _cache, new FakeCatalog(Definition(Sha256Hex(content))), Client(new StubHttpMessageHandler([])));
+
+        var result = await manager.ImportAsync(Requirement(), source);
+
+        Assert.True(result.Success);
+        Assert.True(File.Exists(source));
+        Assert.NotNull(result.InstallerPath);
+        Assert.True(File.Exists(result.InstallerPath));
+    }
+
+    [Fact]
+    public async Task Import_HashMismatch_Should_Fail_Without_Caching_File()
+    {
+        var source = Path.Combine(_tempRoot, "manual-runtime.exe");
+        File.WriteAllBytes(source, Encoding.UTF8.GetBytes("untrusted-bytes"));
+        var manager = new RuntimeDownloadManager(
+            _cache, new FakeCatalog(Definition("ABCDEF")), Client(new StubHttpMessageHandler([])));
+
+        var result = await manager.ImportAsync(Requirement(), source);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Code == "DP2002");
+        Assert.Empty(_cache.List());
     }
 }
